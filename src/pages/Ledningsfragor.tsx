@@ -1,10 +1,70 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { COPILOT_EXAMPLES, answerQuestion } from '../copilot'
+import type { CopilotAnswer } from '../copilot'
 import { SOURCE_ECONOMY, TIME_IN_STAGE } from '../data'
 import { prognosLabel } from '../planning'
 import { useStore } from '../store'
 
 const kr = (n: number) => n.toLocaleString('sv-SE') + ' kr'
+
+// ---------- Copilot-Q&A ----------
+
+function Copilot() {
+  const { planStatuses, warnings, candidates, requisitions, headhuntLinks } = useStore()
+  const navigate = useNavigate()
+  const [q, setQ] = useState('')
+  const [answer, setAnswer] = useState<CopilotAnswer | null>(null)
+  const [asked, setAsked] = useState('')
+
+  const ask = (question: string) => {
+    if (!question.trim()) return
+    setAsked(question)
+    setAnswer(answerQuestion(question, { planStatuses, warnings, candidates, requisitions, headhuntLinks }))
+    setQ('')
+  }
+
+  return (
+    <div className="card copilot-card">
+      <div className="rita-head" style={{ marginBottom: 10 }}>
+        <span className="rita-avatar">R</span>
+        <div>
+          <b>Fråga Rita</b> <span className="muted small">— ledningscopilot</span>
+          <div className="muted small">Ställ frågor i naturligt språk. Svaren räknas live ur pipelinen — så du alltid kan stå till svars.</div>
+        </div>
+      </div>
+      <div className="search-bar-lg">
+        <span className="search-ico">⌕</span>
+        <input
+          placeholder="t.ex. Vilka roller riskerar försening?"
+          value={q}
+          onChange={e => setQ(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && ask(q)}
+          data-testid="copilot-input"
+        />
+        <button className={`btn primary${q.trim() ? '' : ' disabled'}`} disabled={!q.trim()} onClick={() => ask(q)} data-testid="copilot-ask">Fråga</button>
+      </div>
+      <div className="example-chips">
+        {COPILOT_EXAMPLES.map(ex => <button key={ex} className="example-chip" onClick={() => ask(ex)}>{ex}</button>)}
+      </div>
+
+      {answer && (
+        <div className="copilot-answer" data-testid="copilot-answer">
+          <div className="muted small" style={{ marginBottom: 4 }}>Du frågade: ”{asked}”</div>
+          <div style={{ fontWeight: 600, fontSize: 14 }}>{answer.answer}</div>
+          {answer.detail && (
+            <ul className="small" style={{ margin: '8px 0 0 16px' }}>
+              {answer.detail.map((d, i) => <li key={i}>{d}</li>)}
+            </ul>
+          )}
+          {answer.link && (
+            <button className="btn small" style={{ marginTop: 10 }} onClick={() => navigate(answer.link!.to)}>{answer.link.label} →</button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 function CopyButton({ rows, label }: { rows: (string | number)[][]; label: string }) {
   const { toast } = useStore()
@@ -71,6 +131,8 @@ export function Ledningsfragor() {
           </div>
         </div>
       </div>
+
+      <Copilot />
 
       <div className="lf-grid">
         <div className="card lf-card" data-testid="lf-kostnad">

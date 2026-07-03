@@ -139,6 +139,7 @@ interface Store {
   signOffer: (offerId: string, signature: string) => void
   runRetention: () => void
   toggleIntegration: (id: string) => void
+  resetDemo: () => void
   updateProfile: (p: Profile) => void
   addMember: (m: TeamMember) => void
   // WFP
@@ -333,6 +334,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const toggleIntegration = useCallback((id: string) => {
     void run(() => api.integrations.toggle(id))
   }, [run])
+  const resetDemo = useCallback(() => {
+    void run(() => api.settings.resetDemo(), 'Demodata återställd till utgångsläget')
+  }, [run])
 
   const updateProfile = useCallback((p: Profile) => {
     void run(() => api.users.updateProfile(p), 'Profil uppdaterad')
@@ -387,7 +391,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     updateCareerMeta, updateCareerBlock, moveCareerBlock, publishCareer,
     toggleTrigger, addTrigger, toggleNurture, sendNurture,
     decideRequisition, createRequisition, openRoleFromRequisition, canApproveStep,
-    createOffer, sendOffer, signOffer, runRetention, toggleIntegration, updateProfile, addMember,
+    createOffer, sendOffer, signOffer, runRetention, toggleIntegration, resetDemo, updateProfile, addMember,
     updatePlanRow, addPlanRows, deletePlanRow, createScenario, updateScenarioRow, deleteScenario,
     ackWarning, setSetting,
     toasts, toast, tourStep, startTour, setTourStep,
@@ -400,7 +404,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     updateCareerMeta, updateCareerBlock, moveCareerBlock, publishCareer,
     toggleTrigger, addTrigger, toggleNurture, sendNurture,
     decideRequisition, createRequisition, openRoleFromRequisition, canApproveStep,
-    createOffer, sendOffer, signOffer, runRetention, toggleIntegration, updateProfile, addMember,
+    createOffer, sendOffer, signOffer, runRetention, toggleIntegration, resetDemo, updateProfile, addMember,
     updatePlanRow, addPlanRows, deletePlanRow, createScenario, updateScenarioRow, deleteScenario,
     ackWarning, setSetting, toasts, toast, tourStep, startTour,
   ])

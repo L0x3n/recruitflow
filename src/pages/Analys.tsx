@@ -1,11 +1,111 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { FUNNELS, SOURCE_ECONOMY, TIME_IN_STAGE } from '../data'
+import { DIMENSIONS, METRICS, buildReport, formatMetric } from '../reports'
+import type { Dimension, Metric } from '../reports'
 import { useStore } from '../store'
 import type { Candidate, StageId } from '../types'
 
 const STAGE_RANK: Record<StageId, number> = {
   nya: 0, screening: 1, intervju: 2, case: 3, slutintervju: 4, referenser: 5, erbjudande: 6, anstalld: 7, avslag: -1,
+}
+
+// ---------- Rapportbyggare ----------
+
+interface SavedReport { id: number; dim: Dimension; metric: Metric }
+
+function ReportBuilder() {
+  const { candidates, roles, plan, headhuntLinks, toast } = useStore()
+  const [dim, setDim] = useState<Dimension>('kalla')
+  const [metric, setMetric] = useState<Metric>('anstallda')
+  const [saved, setSaved] = useState<SavedReport[]>([])
+  const seq = useMemo(() => ({ n: 0 }), [])
+
+  const rows = useMemo(
+    () => buildReport(dim, metric, { candidates, roles, plan, headhuntLinks }),
+    [dim, metric, candidates, roles, plan, headhuntLinks],
+  )
+  const max = Math.max(1, ...rows.map(r => r.value))
+  const dimLabel = DIMENSIONS.find(d => d.id === dim)!.label
+  const metricLabel = METRICS.find(m => m.id === metric)!.label
+
+  const copy = async () => {
+    const tsv = [[dimLabel, metricLabel], ...rows.map(r => [r.label, r.value])].map(r => r.join('\t')).join('\n')
+    try { await navigator.clipboard.writeText(tsv); toast('Rapport kopierad') } catch { toast('Kunde inte kopiera') }
+  }
+
+  return (
+    <div className="grid" style={{ gap: 14 }}>
+      <div className="card">
+        <h3 style={{ marginBottom: 10 }}>Bygg din rapport</h3>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <div>
+            <label className="small muted">Dimension</label>
+            <select className="editable-input mini-select" value={dim} onChange={e => setDim(e.target.value as Dimension)} data-testid="report-dim">
+              {DIMENSIONS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="small muted">Mått</label>
+            <select className="editable-input mini-select" value={metric} onChange={e => setMetric(e.target.value as Metric)} data-testid="report-metric">
+              {METRICS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+            </select>
+          </div>
+          <button className="btn small" onClick={copy}>⧉ Kopiera</button>
+          <button className="btn small primary" onClick={() => { setSaved(s => [...s, { id: ++seq.n, dim, metric }]); toast('Rapportkort sparat') }} data-testid="report-save">
+            + Spara som kort
+          </button>
+        </div>
+      </div>
+
+      <div className="card" data-testid="report-result">
+        <h3 style={{ marginBottom: 4 }}>{metricLabel} per {dimLabel.toLowerCase()}</h3>
+        <div className="muted small" style={{ marginBottom: 12 }}>Live ur pipelinen · {rows.length} grupper</div>
+        {rows.length === 0 && <div className="muted small">Ingen data för den kombinationen.</div>}
+        {rows.map(r => (
+          <div key={r.label} className="bar-row">
+            <div className="b-label">{r.label}</div>
+            <div className="b-bar" style={{ width: `${Math.max(6, (r.value / max) * 60)}%` }}>{formatMetric(r.value, metric)}</div>
+            <div className="muted small">{r.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {saved.length > 0 && (
+        <div>
+          <h3 style={{ marginBottom: 8 }}>Sparade kort ({saved.length})</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+            {saved.map(s => <SavedCard key={s.id} rep={s} onRemove={() => setSaved(x => x.filter(y => y.id !== s.id))} />)}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SavedCard({ rep, onRemove }: { rep: SavedReport; onRemove: () => void }) {
+  const { candidates, roles, plan, headhuntLinks } = useStore()
+  const rows = useMemo(() => buildReport(rep.dim, rep.metric, { candidates, roles, plan, headhuntLinks }).slice(0, 5),
+    [rep, candidates, roles, plan, headhuntLinks])
+  const max = Math.max(1, ...rows.map(r => r.value))
+  const dimLabel = DIMENSIONS.find(d => d.id === rep.dim)!.label
+  const metricLabel = METRICS.find(m => m.id === rep.metric)!.label
+  return (
+    <div className="card" style={{ padding: 14 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <b className="small">{metricLabel} / {dimLabel}</b>
+        <button className="btn small" onClick={onRemove}>✕</button>
+      </div>
+      <div style={{ marginTop: 8 }}>
+        {rows.map(r => (
+          <div key={r.label} className="bar-row" style={{ marginBottom: 5 }}>
+            <div className="b-label" style={{ width: 90, fontSize: 11 }}>{r.label}</div>
+            <div className="b-bar" style={{ width: `${Math.max(8, (r.value / max) * 55)}%`, height: 18 }}>{formatMetric(r.value, rep.metric)}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 // Tratt för roller som skapats i appen — härleds ur live-pipelinen.
@@ -26,6 +126,7 @@ export function Analys() {
   const location = useLocation()
   const { candidates, roles } = useStore()
   const [roleId, setRoleId] = useState('backend')
+  const [tab, setTab] = useState<'standard' | 'builder'>('standard')
 
   useEffect(() => {
     const params = new URLSearchParams(location.search)
@@ -47,6 +148,13 @@ export function Analys() {
         </div>
       </div>
 
+      <div className="tabs" style={{ borderBottom: '1px solid var(--border)' }}>
+        <button className={tab === 'standard' ? 'on' : ''} onClick={() => setTab('standard')}>Standardrapporter</button>
+        <button className={tab === 'builder' ? 'on' : ''} onClick={() => setTab('builder')}>Rapportbyggare</button>
+      </div>
+
+      {tab === 'builder' && <ReportBuilder />}
+      {tab === 'standard' && <>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
@@ -151,6 +259,7 @@ export function Analys() {
           ✓ Kandidater med scorecard ≥ 4,2 presterar 31 % bättre efter 6 mån (mockdata).
         </div>
       </div>
+      </>}
     </div>
   )
 }

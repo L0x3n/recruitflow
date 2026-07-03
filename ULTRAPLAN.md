@@ -15,7 +15,12 @@
   nurture. SmartRecruiters-styrningen: requisitions m. godkännandekedja (chef→ekonomi→ledning) +
   budgetkoll + öppna-roll, offers m. lön-validering + e-sign (canvas-signatur), compliance-center
   (audit/AI-transparens/GDPR-gallring/marketplace-integrationer).
-- ⏭️ **Kvar: Etapp 4 (Fas 8–9)** rapportbyggare/copilot-Q&A + datapipeline-karta v2 + polish.
+- ✅ **Etapp 4 (Fas 8–9)** — rapportbyggare (dimension × mått → tabell/diagram + sparade kort),
+  copilot-Q&A på Ledningsfrågor (regelbaserad parser → svar live ur datan), datapipeline-karta v2
+  (dynamisk layout, nya noder: WFP/karriärsida/sourcing in, varningar/ledningsfrågor ut, andra loopen
+  plan→utfall→plan), demo-reset, README.
+
+**🎉 Alla faser klara — hela ULTRAPLANen är byggd.**
 
 ---
 

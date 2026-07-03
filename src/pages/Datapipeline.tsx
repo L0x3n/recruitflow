@@ -3,21 +3,29 @@ import { useNavigate } from 'react-router-dom'
 import { PIPE_NODE, PIPELINE_INSIGHTS, PIPELINE_SOURCES } from '../data'
 import type { PipelineNode } from '../data'
 
-// Fast koordinatsystem (px) — noder och SVG delar samma canvas.
-const W = 1150
-const H = 620
-const SRC_W = 196
-const SRC_XS = [37, 257, 477, 697, 917]
+// Dynamiskt koordinatsystem (px) — positioner räknas ur antalet noder.
+const W = 1200
+const H = 660
+const MARGIN = 24
+const GAP = 14
 const SRC_Y = 20
-const SRC_H = 64
-const PIPE = { x: 85, y: 280, w: 980, h: 74 }
-const PIPE_TOPS = [185, 380, 575, 770, 965]
-const OUT_W = 240
-const OUT_XS = [135, 455, 775]
-const OUT_Y = 520
-const PIPE_BOTTOMS = [285, 575, 865]
+const SRC_H = 66
+const PIPE = { x: 70, y: 300, w: W - 140, h: 74 }
+const OUT_Y = 540
+const OUT_H = 70
 
-const CHEF_INDEX = 2
+const N_SRC = PIPELINE_SOURCES.length
+const N_OUT = PIPELINE_INSIGHTS.length
+const SRC_W = (W - MARGIN * 2 - GAP * (N_SRC - 1)) / N_SRC
+const OUT_W = (W - MARGIN * 2 - GAP * (N_OUT - 1)) / N_OUT
+
+const srcX = (i: number) => MARGIN + i * (SRC_W + GAP)
+const outX = (i: number) => MARGIN + i * (OUT_W + GAP)
+// fördela rör-anslutningar jämnt över rörets bredd
+const pipeInX = (i: number) => PIPE.x + (PIPE.w * (i + 0.5)) / N_SRC
+const pipeOutX = (i: number) => PIPE.x + (PIPE.w * (i + 0.5)) / N_OUT
+
+const CHEF_INDEX = PIPELINE_SOURCES.findIndex(s => s.id === 'chefer')
 
 interface Tip { node: PipelineNode; x: number; y: number }
 
@@ -31,26 +39,31 @@ export function Datapipeline() {
     const sep = pathAndQuery.includes('?') ? '&' : '?'
     navigate(`${pathAndQuery}${sep}from=pipeline&fields=${encodeURIComponent(n.fields.join(', '))}${hash ? '#' + hash : ''}`)
   }
-
   const hover = (n: PipelineNode, x: number, y: number) => setTip({ node: n, x, y })
 
   const inPath = (i: number) => {
-    const cx = SRC_XS[i] + SRC_W / 2
-    const px = PIPE_TOPS[i]
-    return `M ${cx} ${SRC_Y + SRC_H} C ${cx} 180, ${px} 200, ${px} ${PIPE.y}`
+    const cx = srcX(i) + SRC_W / 2
+    const px = pipeInX(i)
+    return `M ${cx} ${SRC_Y + SRC_H} C ${cx} ${SRC_Y + SRC_H + 100}, ${px} ${PIPE.y - 80}, ${px} ${PIPE.y}`
   }
   const brokenPath = () => {
-    const cx = SRC_XS[CHEF_INDEX] + SRC_W / 2
-    return `M ${cx} ${SRC_Y + SRC_H} C ${cx} 130, ${cx} 155, ${cx} 185`
+    const cx = srcX(CHEF_INDEX) + SRC_W / 2
+    return `M ${cx} ${SRC_Y + SRC_H} C ${cx} ${SRC_Y + SRC_H + 60}, ${cx} ${SRC_Y + SRC_H + 90}, ${cx} ${SRC_Y + SRC_H + 120}`
   }
   const outPath = (i: number) => {
-    const bx = PIPE_BOTTOMS[i]
-    const cx = OUT_XS[i] + OUT_W / 2
-    return `M ${bx} ${PIPE.y + PIPE.h} C ${bx} 430, ${cx} 445, ${cx} ${OUT_Y}`
+    const bx = pipeOutX(i)
+    const cx = outX(i) + OUT_W / 2
+    return `M ${bx} ${PIPE.y + PIPE.h} C ${bx} ${PIPE.y + PIPE.h + 60}, ${cx} ${OUT_Y - 60}, ${cx} ${OUT_Y}`
   }
-  const loopPath = `M ${OUT_XS[2] + OUT_W} 552 C 1135 545, 1135 110, ${SRC_XS[4] + SRC_W - 40} ${SRC_Y + SRC_H + 8}`
 
-  const chefX = SRC_XS[CHEF_INDEX] + SRC_W / 2
+  // Huvudloop: insikter → tillbaka upp till källorna (höger sida)
+  const loopPath = `M ${outX(N_OUT - 1) + OUT_W} ${OUT_Y + OUT_H / 2} C ${W - 6} ${OUT_Y}, ${W - 6} ${SRC_Y + 40}, ${srcX(N_SRC - 1) + SRC_W - 30} ${SRC_Y + SRC_H + 6}`
+  // Andra loopen: Lärande/QoH → Planering (plan → utfall → nästa plan), vänster sida
+  const larIdx = PIPELINE_INSIGHTS.findIndex(n => n.id === 'larande')
+  const planIdx = 0
+  const loop2 = `M ${outX(larIdx) + OUT_W / 2} ${OUT_Y + OUT_H} C ${20} ${OUT_Y + 90}, ${20} ${SRC_Y - 40}, ${srcX(planIdx) + SRC_W / 2} ${SRC_Y}`
+
+  const chefX = srcX(CHEF_INDEX) + SRC_W / 2
 
   return (
     <div className="pipeline-page" data-tour="pipeline-map">
@@ -60,7 +73,7 @@ export function Datapipeline() {
           <div className="sub">
             {reality
               ? <span style={{ color: '#C2410C', fontWeight: 650 }}>Verkligheten: chefsfeedback når aldrig pipen — datan läcker innan den blir strukturerad.</span>
-              : 'Varje nod är klickbar och tar dig till exakt den skärm där datan skapas eller används.'}
+              : 'Varje nod är klickbar och tar dig till exakt den skärm där datan skapas eller används. Två loopar: process ↻ och plan → utfall → nästa plan.'}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -82,6 +95,9 @@ export function Datapipeline() {
               <marker id="arrow-loop" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
                 <path d="M 0 0 L 10 5 L 0 10 z" fill="#7C9C8E" />
               </marker>
+              <marker id="arrow-loop2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#2563EB" />
+              </marker>
             </defs>
 
             {/* Inflöden (blå) */}
@@ -92,26 +108,26 @@ export function Datapipeline() {
                   <path d={inPath(i)} fill="none" stroke="#B6CDF5" strokeWidth={2.5} />
                   {[0, 1].map(k => (
                     <circle key={k} r={4} fill="#2563EB">
-                      <animateMotion dur="3.4s" repeatCount="indefinite" begin={`${i * 0.55 + k * 1.7}s`} path={inPath(i)} />
+                      <animateMotion dur="3.4s" repeatCount="indefinite" begin={`${i * 0.45 + k * 1.7}s`} path={inPath(i)} />
                     </circle>
                   ))}
                 </g>
               )
             })}
 
-            {/* Chefsflödet i verklighetsläge: bruten, orange, droppar som aldrig når pipen */}
+            {/* Chefsflödet i verklighetsläge: bruten, orange, droppar */}
             {reality && (
               <g>
                 <path d={brokenPath()} fill="none" stroke="#F0913F" strokeWidth={2.5} strokeDasharray="7 6" />
-                <text x={chefX} y={207} textAnchor="middle" fontSize={22} fontWeight={800} fill="#F0913F">✕</text>
+                <text x={chefX} y={SRC_Y + SRC_H + 140} textAnchor="middle" fontSize={22} fontWeight={800} fill="#F0913F">✕</text>
                 {[-14, 0, 14].map((dx, k) => (
                   <circle key={k} cx={chefX + dx} r={4} fill="#F0913F">
-                    <animate attributeName="cy" values="215;268" dur="1.6s" begin={`${k * 0.5}s`} repeatCount="indefinite" />
+                    <animate attributeName="cy" values={`${SRC_Y + SRC_H + 150};${PIPE.y - 20}`} dur="1.6s" begin={`${k * 0.5}s`} repeatCount="indefinite" />
                     <animate attributeName="opacity" values="1;0" dur="1.6s" begin={`${k * 0.5}s`} repeatCount="indefinite" />
                   </circle>
                 ))}
-                <text x={chefX} y={252} textAnchor="middle" fontSize={11.5} fontWeight={700} fill="#C2410C">
-                  3 dagars svarstid · bortglömt i Slack · aldrig strukturerat
+                <text x={chefX} y={SRC_Y + SRC_H + 178} textAnchor="middle" fontSize={11.5} fontWeight={700} fill="#C2410C">
+                  3 dagars svarstid · bortglömt i Slack
                 </text>
               </g>
             )}
@@ -122,21 +138,27 @@ export function Datapipeline() {
                 <path d={outPath(i)} fill="none" stroke="#ABCEBB" strokeWidth={2.5} />
                 {[0, 1].map(k => (
                   <circle key={k} r={4} fill="#1F5C46">
-                    <animateMotion dur="3.4s" repeatCount="indefinite" begin={`${i * 0.7 + k * 1.7 + 0.3}s`} path={outPath(i)} />
+                    <animateMotion dur="3.4s" repeatCount="indefinite" begin={`${i * 0.55 + k * 1.7 + 0.3}s`} path={outPath(i)} />
                   </circle>
                 ))}
               </g>
             ))}
 
-            {/* Återkopplingsloopen */}
+            {/* Huvudloop */}
             <path d={loopPath} fill="none" stroke="#7C9C8E" strokeWidth={2} strokeDasharray="6 6" markerEnd="url(#arrow-loop)" />
-            <text x={1128} y={330} textAnchor="middle" fontSize={11} fill="#6B7A73" transform="rotate(90 1128 330)">
-              utfallet förbättrar nästa kravprofil
+            <text x={W - 14} y={(SRC_Y + OUT_Y) / 2} textAnchor="middle" fontSize={11} fill="#6B7A73" transform={`rotate(90 ${W - 14} ${(SRC_Y + OUT_Y) / 2})`}>
+              insikter förbättrar processen
+            </text>
+
+            {/* Andra loopen: plan → utfall → plan */}
+            <path d={loop2} fill="none" stroke="#2563EB" strokeWidth={2} strokeDasharray="2 5" markerEnd="url(#arrow-loop2)" opacity={0.8} />
+            <text x={12} y={(SRC_Y + OUT_Y) / 2} textAnchor="middle" fontSize={11} fontWeight={700} fill="#2563EB" transform={`rotate(-90 12 ${(SRC_Y + OUT_Y) / 2})`}>
+              utfallet formar nästa årsplan
             </text>
 
             {/* Radrubriker */}
-            <text x={10} y={14} fontSize={11} fontWeight={700} fill="#6B7A73" letterSpacing="0.06em">KÄLLOR — RÅDATA IN</text>
-            <text x={10} y={512} fontSize={11} fontWeight={700} fill="#6B7A73" letterSpacing="0.06em">INSIKTER UT</text>
+            <text x={MARGIN} y={14} fontSize={11} fontWeight={700} fill="#6B7A73" letterSpacing="0.06em">KÄLLOR — RÅDATA IN</text>
+            <text x={MARGIN} y={OUT_Y - 8} fontSize={11} fontWeight={700} fill="#6B7A73" letterSpacing="0.06em">INSIKTER UT</text>
           </svg>
 
           {/* Källnoder */}
@@ -144,9 +166,9 @@ export function Datapipeline() {
             <div
               key={n.id}
               className={`pl-node src${reality && i === CHEF_INDEX ? ' broken' : ''}`}
-              style={{ left: SRC_XS[i], top: SRC_Y, width: SRC_W, height: SRC_H }}
+              style={{ left: srcX(i), top: SRC_Y, width: SRC_W, height: SRC_H }}
               onClick={() => go(n)}
-              onMouseEnter={() => hover(n, SRC_XS[i], SRC_Y + SRC_H + 8)}
+              onMouseEnter={() => hover(n, srcX(i), SRC_Y + SRC_H + 8)}
               onMouseLeave={() => setTip(null)}
               data-testid={`pl-node-${n.id}`}
             >
@@ -180,9 +202,9 @@ export function Datapipeline() {
             <div
               key={n.id}
               className="pl-node out"
-              style={{ left: OUT_XS[i], top: OUT_Y, width: OUT_W, height: SRC_H }}
+              style={{ left: outX(i), top: OUT_Y, width: OUT_W, height: OUT_H }}
               onClick={() => go(n)}
-              onMouseEnter={() => hover(n, OUT_XS[i], OUT_Y - 128)}
+              onMouseEnter={() => hover(n, outX(i), OUT_Y - 128)}
               onMouseLeave={() => setTip(null)}
               data-testid={`pl-node-${n.id}`}
             >

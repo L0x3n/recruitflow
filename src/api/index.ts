@@ -92,5 +92,6 @@ export const api = {
   settings: {
     set: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) =>
       call(() => server.setSetting(key, value), { bypassFail: true }),
+    resetDemo: () => call(() => server.resetDemo(), { bypassFail: true }),
   },
 }

@@ -720,3 +720,30 @@ export function setSetting<K extends keyof AppSettings>(key: K, value: AppSettin
   db.settings = { ...db.settings, [key]: value }
   logAudit('Inställning ändrad', `${key} = ${String(value)}`)
 }
+
+// Återställer all demodata till seed (behåller inloggad användare).
+export function resetDemo() {
+  const keepUser = db.currentUserId
+  db.users = USERS.map(u => ({ ...u }))
+  db.candidates = [...CANDIDATES, ...HEADHUNT_CANDIDATES]
+  db.roles = ROLES
+  db.feedback = FEEDBACK_REQUESTS
+  db.offers = OFFERS
+  db.plan = { id: 'plan-2026', namn: 'Årsplan 2026', ar: 2026, rows: PLAN_ROWS_2026 }
+  db.scenarios = []
+  db.warningAcks = []
+  db.savedSourced = []
+  db.threads = OUTREACH_THREADS
+  db.headhuntLinks = HEADHUNT_LINKS
+  db.career = { ...CAREER_PAGE, blocks: CAREER_PAGE.blocks.map(b => ({ ...b })) }
+  db.triggers = TRIGGERS.map(t => ({ ...t }))
+  db.nurture = NURTURE_CAMPAIGNS.map(n => ({ ...n }))
+  db.requisitions = REQUISITIONS.map(r => ({ ...r, steps: r.steps.map(s => ({ ...s })) }))
+  db.offerDrafts = []
+  db.integrations = INTEGRATIONS.map(i => ({ ...i }))
+  db.audit = []
+  db.auditSeq = 0
+  db.settings = { apiFel: false }
+  db.currentUserId = keepUser
+  logAudit('Demo', 'All demodata återställd till utgångsläget')
+}

@@ -135,7 +135,7 @@ const DATAMODELL = [
 ]
 
 function DemoApiCard() {
-  const { settings, setSetting } = useStore()
+  const { settings, setSetting, resetDemo } = useStore()
   return (
     <div className="card">
       <h2 style={{ marginBottom: 6 }}>Demo & API</h2>
@@ -143,7 +143,7 @@ function DemoApiCard() {
         Appen pratar med ett mockat API-lager (format efter SmartRecruiters/Teamtailor) med simulerad latens.
         Slå på felsimulering för att se hur appen hanterar ett API som ligger nere.
       </div>
-      <label style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer' }}>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer', marginBottom: 12 }}>
         <input
           type="checkbox"
           checked={settings.apiFel}
@@ -152,6 +152,8 @@ function DemoApiCard() {
         />
         <span>Simulera API-fel (alla ändringar svarar 503 tills du stänger av)</span>
       </label>
+      <button className="btn" onClick={resetDemo} data-testid="reset-demo">↺ Återställ all demodata</button>
+      <div className="muted small" style={{ marginTop: 6 }}>Nollställer kandidater, plan, requisitions, länkar m.m. till utgångsläget (du förblir inloggad).</div>
     </div>
   )
 }

@@ -1146,10 +1146,22 @@ export interface PipelineNode {
 
 export const PIPELINE_SOURCES: PipelineNode[] = [
   {
-    id: 'rekryterare', label: 'Rekryterare',
-    desc: 'Skapar stegförflyttningar, screeningbeslut och avslagsorsaker',
-    fields: ['stegförflyttning', 'tidsstämpel & aktör', 'avslagsorsak', 'screeningbeslut'],
-    to: '/kandidater',
+    id: 'planering', label: 'Planering (WFP)',
+    desc: 'Workforce planning — måltal, budget och delegering',
+    fields: ['headcount-mål', 'löne- & rekryteringsbudget', 'målstartdatum', 'ansvarig rekryterare'],
+    to: '/planering',
+  },
+  {
+    id: 'karriarsida', label: 'Karriärsida & annonser',
+    desc: 'Employer branding, publik jobbsida och kanaldata',
+    fields: ['karriärsidans block', 'publika ansökningar', 'kanal & kostnad', 'kostnad/ansökan'],
+    to: '/karriarsida',
+  },
+  {
+    id: 'sourcing', label: 'AI-sourcing & outreach',
+    desc: 'Webbprofiler, matchning och outreach-svar',
+    fields: ['sammanslagna webbprofiler', 'matchpoäng', 'outreach-trådar', 'svarstatus'],
+    to: '/sourcing',
   },
   {
     id: 'ansokningar', label: 'Ansökningar',
@@ -1162,12 +1174,6 @@ export const PIPELINE_SOURCES: PipelineNode[] = [
     desc: 'Scorecards och intervjufeedback — via röst, foto eller text',
     fields: ['scorecard (1–5 per kriterium)', 'intervjuanteckning', 'bedömare', 'svarstid'],
     to: '/feedback',
-  },
-  {
-    id: 'jobbannonser', label: 'Jobbannonser',
-    desc: 'Kanaldata från annonsering',
-    fields: ['kanal & kostnad', 'visningar', 'ansökningar per kanal', 'kostnad/ansökan'],
-    to: '/roller/backend?tab=annonsering',
   },
   {
     id: 'tester', label: 'Tester & referenser',
@@ -1185,10 +1191,22 @@ export const PIPELINE_INSIGHTS: PipelineNode[] = [
     to: '/',
   },
   {
+    id: 'varningar', label: 'Varningar',
+    desc: 'Automatiska signaler när något ligger efter',
+    fields: ['pipeline-täckning', 'prognos vs mål', 'budgetöverdrag', 'inaktivitet'],
+    to: '/',
+  },
+  {
     id: 'beslutsunderlag', label: 'Beslutsunderlag',
     desc: 'Jämförbara scorecards → dokumenterade beslut',
     fields: ['kandidatjämförelse', 'radardiagram', 'beslutsmotivering', 'signaturer'],
     to: '/erbjudanden',
+  },
+  {
+    id: 'ledning', label: 'Ledningsfrågor',
+    desc: 'Board-ready svar + copilot i naturligt språk',
+    fields: ['plan vs utfall', 'kostnad/avdelning', 'riskroller', 'copilot-Q&A'],
+    to: '/ledningsfragor',
   },
   {
     id: 'larande', label: 'Lärande / Quality of hire',
