@@ -5,7 +5,7 @@ import type { NewRoleInput, Snapshot } from './api'
 import { computePlan, evaluateWarnings } from './planning'
 import type { RowStatus } from './planning'
 import type {
-  AppSettings, PlanRow, PlanWarning, Profile, ScorecardCriterion, StageId, TeamMember, User,
+  AppSettings, PlanRow, PlanWarning, Profile, ScorecardCriterion, StageId, TeamMember, TriggerAction, User,
 } from './types'
 
 export interface TourStep {
@@ -86,6 +86,12 @@ interface Store {
   savedSourced: Snapshot['savedSourced']
   threads: Snapshot['threads']
   headhuntLinks: Snapshot['headhuntLinks']
+  career: Snapshot['career']
+  triggers: Snapshot['triggers']
+  nurture: Snapshot['nurture']
+  requisitions: Snapshot['requisitions']
+  offerDrafts: Snapshot['offerDrafts']
+  integrations: Snapshot['integrations']
   audit: Snapshot['audit']
   settings: AppSettings
   // härlett
@@ -116,6 +122,23 @@ interface Store {
   createHeadhuntLink: (roleId: string) => Promise<string | null>
   registerHeadhuntClick: (linkId: string) => void
   applyViaHeadhunt: (linkId: string, roleId: string, name: string, note: string) => Promise<string | null>
+  updateCareerMeta: (patch: Partial<Pick<Snapshot['career'], 'accent' | 'companyName' | 'tagline'>>) => void
+  updateCareerBlock: (blockId: string, patch: Partial<Snapshot['career']['blocks'][number]>) => void
+  moveCareerBlock: (blockId: string, dir: -1 | 1) => void
+  publishCareer: (published: boolean) => void
+  toggleTrigger: (id: string) => void
+  addTrigger: (when: StageId, action: import('./types').TriggerAction, detail: string) => void
+  toggleNurture: (id: string) => void
+  sendNurture: (id: string) => void
+  decideRequisition: (reqId: string, approve: boolean, comment: string) => void
+  createRequisition: (input: { rollTitel: string; avdelning: string; lonebudget: number; antal: number; motivering: string; planRowId?: string }) => Promise<string | null>
+  openRoleFromRequisition: (reqId: string) => Promise<string | null>
+  canApproveStep: (stepRole: import('./types').ApprovalRole) => boolean
+  createOffer: (candidateId: string, roleId: string, lon: number, startDate: string) => Promise<string | null>
+  sendOffer: (offerId: string) => void
+  signOffer: (offerId: string, signature: string) => void
+  runRetention: () => void
+  toggleIntegration: (id: string) => void
   updateProfile: (p: Profile) => void
   addMember: (m: TeamMember) => void
   // WFP
@@ -255,6 +278,62 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     run(() => api.headhunt.apply(linkId, roleId, name, note)),
   [run])
 
+  const updateCareerMeta = useCallback((patch: Partial<Pick<Snapshot['career'], 'accent' | 'companyName' | 'tagline'>>) => {
+    void run(() => api.career.updateMeta(patch))
+  }, [run])
+  const updateCareerBlock = useCallback((blockId: string, patch: Partial<Snapshot['career']['blocks'][number]>) => {
+    void run(() => api.career.updateBlock(blockId, patch))
+  }, [run])
+  const moveCareerBlock = useCallback((blockId: string, dir: -1 | 1) => {
+    void run(() => api.career.moveBlock(blockId, dir))
+  }, [run])
+  const publishCareer = useCallback((published: boolean) => {
+    void run(() => api.career.publish(published), published ? 'Karriärsidan publicerad — nu live på /karriar' : 'Karriärsidan avpublicerad')
+  }, [run])
+  const toggleTrigger = useCallback((id: string) => {
+    void run(() => api.triggers.toggle(id))
+  }, [run])
+  const addTrigger = useCallback((when: StageId, action: TriggerAction, detail: string) => {
+    void run(() => api.triggers.add(when, action, detail), 'Triggerregel skapad')
+  }, [run])
+  const toggleNurture = useCallback((id: string) => {
+    void run(() => api.nurture.toggle(id))
+  }, [run])
+  const sendNurture = useCallback((id: string) => {
+    void run(() => api.nurture.send(id), 'Nurture-utskick skickat')
+  }, [run])
+
+  const decideRequisition = useCallback((reqId: string, approve: boolean, comment: string) => {
+    void run(() => api.requisitions.decide(reqId, approve, comment), approve ? 'Godkännande registrerat' : 'Requisition avslagen')
+  }, [run])
+  const createRequisition = useCallback(async (input: { rollTitel: string; avdelning: string; lonebudget: number; antal: number; motivering: string; planRowId?: string }) =>
+    run(() => api.requisitions.create(input), 'Requisition skapad — skickad för godkännande'),
+  [run])
+  const openRoleFromRequisition = useCallback(async (reqId: string) =>
+    run(() => api.requisitions.openRole(reqId), 'Rollen öppnad ur den godkända requisitionen'),
+  [run])
+  const canApproveStep = useCallback((stepRole: import('./types').ApprovalRole) => {
+    const r = snap.currentUser?.role
+    if (stepRole === 'chef' || stepRole === 'ekonomi') return r === 'chef'
+    if (stepRole === 'ledning') return r === 'ledning'
+    return false
+  }, [snap.currentUser])
+  const createOffer = useCallback(async (candidateId: string, roleId: string, lon: number, startDate: string) =>
+    run(() => api.offerDrafts.create(candidateId, roleId, lon, startDate), 'Erbjudande-utkast skapat'),
+  [run])
+  const sendOffer = useCallback((offerId: string) => {
+    void run(() => api.offerDrafts.send(offerId), 'Erbjudande skickat till kandidaten')
+  }, [run])
+  const signOffer = useCallback((offerId: string, signature: string) => {
+    void run(() => api.offerDrafts.sign(offerId, signature), 'Erbjudandet signerat 🎉')
+  }, [run])
+  const runRetention = useCallback(() => {
+    void run(() => api.compliance.runRetention(), 'Gallringskörning genomförd')
+  }, [run])
+  const toggleIntegration = useCallback((id: string) => {
+    void run(() => api.integrations.toggle(id))
+  }, [run])
+
   const updateProfile = useCallback((p: Profile) => {
     void run(() => api.users.updateProfile(p), 'Profil uppdaterad')
   }, [run])
@@ -296,13 +375,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     team: snap.team, users: snap.users, currentUser: snap.currentUser,
     plan: snap.plan, scenarios: snap.scenarios, warningAcks: snap.warningAcks,
     savedSourced: snap.savedSourced, threads: snap.threads, headhuntLinks: snap.headhuntLinks,
+    career: snap.career, triggers: snap.triggers, nurture: snap.nurture,
+    requisitions: snap.requisitions, offerDrafts: snap.offerDrafts, integrations: snap.integrations,
     audit: snap.audit, settings: snap.settings,
     byId, roleTitleOf, profile, can, planStatuses, warnings,
     login, logout,
     moveCandidate, rejectTarget, requestReject, confirmReject, cancelReject,
     answerFeedback, remindFeedback, remindOffer, addRole, saveSourced,
     sendMessage, advanceSequence, enrollSequence, moveFromThread,
-    createHeadhuntLink, registerHeadhuntClick, applyViaHeadhunt, updateProfile, addMember,
+    createHeadhuntLink, registerHeadhuntClick, applyViaHeadhunt,
+    updateCareerMeta, updateCareerBlock, moveCareerBlock, publishCareer,
+    toggleTrigger, addTrigger, toggleNurture, sendNurture,
+    decideRequisition, createRequisition, openRoleFromRequisition, canApproveStep,
+    createOffer, sendOffer, signOffer, runRetention, toggleIntegration, updateProfile, addMember,
     updatePlanRow, addPlanRows, deletePlanRow, createScenario, updateScenarioRow, deleteScenario,
     ackWarning, setSetting,
     toasts, toast, tourStep, startTour, setTourStep,
@@ -311,7 +396,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     moveCandidate, rejectTarget, requestReject, confirmReject, cancelReject,
     answerFeedback, remindFeedback, remindOffer, addRole, saveSourced,
     sendMessage, advanceSequence, enrollSequence, moveFromThread,
-    createHeadhuntLink, registerHeadhuntClick, applyViaHeadhunt, updateProfile, addMember,
+    createHeadhuntLink, registerHeadhuntClick, applyViaHeadhunt,
+    updateCareerMeta, updateCareerBlock, moveCareerBlock, publishCareer,
+    toggleTrigger, addTrigger, toggleNurture, sendNurture,
+    decideRequisition, createRequisition, openRoleFromRequisition, canApproveStep,
+    createOffer, sendOffer, signOffer, runRetention, toggleIntegration, updateProfile, addMember,
     updatePlanRow, addPlanRows, deletePlanRow, createScenario, updateScenarioRow, deleteScenario,
     ackWarning, setSetting, toasts, toast, tourStep, startTour,
   ])

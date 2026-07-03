@@ -3,13 +3,16 @@
 // bytas mot riktiga API:er (SmartRecruiters/Teamtailor-form) utan UI-ändringar.
 
 import {
-  CANDIDATES, FEEDBACK_REQUESTS, HEADHUNT_CANDIDATES, HEADHUNT_LINKS, OFFERS, OUTREACH_THREADS,
-  PLAN_ROWS_2026, ROLES, SEQUENCES, SOURCED_POOL, USERS, roleTitle, stageLabel,
+  CANDIDATES, CAREER_PAGE, FEEDBACK_REQUESTS, HEADHUNT_CANDIDATES, HEADHUNT_LINKS, INTEGRATIONS, NURTURE_CAMPAIGNS,
+  OFFERS, OUTREACH_THREADS, PLAN_ROWS_2026, REQUISITIONS, ROLES, SEQUENCES, SOURCED_POOL, TRIGGERS, USERS,
+  roleTitle, stageLabel,
 } from '../data'
 import { matchProfile } from '../sourcing'
 import type {
-  AppSettings, AuditEvent, Candidate, FeedbackRequest, HeadhuntLink, Offer, OutreachThread, PlanRow, Profile, Role,
-  Scenario, Scorecard, ScorecardCriterion, StageId, TeamMember, User, WarningAck, WorkforcePlan,
+  AppSettings, ApprovalRole, ApprovalStatus, AuditEvent, Candidate, CareerBlock, CareerPage, FeedbackRequest,
+  HeadhuntLink, Integration, NurtureCampaign, Offer, OfferDraft, OutreachThread, PlanRow, Profile, Requisition,
+  Role, Scenario, Scorecard, ScorecardCriterion, StageId, TeamMember, TriggerAction, TriggerRule, User, WarningAck,
+  WorkforcePlan,
 } from '../types'
 
 export interface NewRoleInput {
@@ -37,6 +40,12 @@ interface DB {
   savedSourced: string[]
   threads: OutreachThread[]
   headhuntLinks: HeadhuntLink[]
+  career: CareerPage
+  triggers: TriggerRule[]
+  nurture: NurtureCampaign[]
+  requisitions: Requisition[]
+  offerDrafts: OfferDraft[]
+  integrations: Integration[]
   audit: AuditEvent[]
   auditSeq: number
   settings: AppSettings
@@ -56,6 +65,12 @@ export interface Snapshot {
   savedSourced: string[]
   threads: OutreachThread[]
   headhuntLinks: HeadhuntLink[]
+  career: CareerPage
+  triggers: TriggerRule[]
+  nurture: NurtureCampaign[]
+  requisitions: Requisition[]
+  offerDrafts: OfferDraft[]
+  integrations: Integration[]
   audit: AuditEvent[]
   settings: AppSettings
 }
@@ -87,6 +102,12 @@ export const db: DB = {
   savedSourced: [],
   threads: OUTREACH_THREADS,
   headhuntLinks: HEADHUNT_LINKS,
+  career: CAREER_PAGE,
+  triggers: TRIGGERS,
+  nurture: NURTURE_CAMPAIGNS,
+  requisitions: REQUISITIONS,
+  offerDrafts: [],
+  integrations: INTEGRATIONS,
   audit: [],
   auditSeq: 0,
   settings: { apiFel: false },
@@ -113,6 +134,12 @@ export function snapshot(): Snapshot {
     savedSourced: [...db.savedSourced],
     threads: db.threads.map(t => ({ ...t, messages: [...t.messages] })),
     headhuntLinks: [...db.headhuntLinks],
+    career: { ...db.career, blocks: db.career.blocks.map(b => ({ ...b })) },
+    triggers: [...db.triggers],
+    nurture: [...db.nurture],
+    requisitions: db.requisitions.map(r => ({ ...r, steps: r.steps.map(s => ({ ...s })) })),
+    offerDrafts: [...db.offerDrafts],
+    integrations: [...db.integrations],
     audit: [...db.audit],
     settings: { ...db.settings },
   }
@@ -134,6 +161,23 @@ export function logout() {
 
 // ---------- Kandidater ----------
 
+const TRIGGER_LABEL: Record<TriggerAction, string> = {
+  mail: '✉ Automatiskt mail skickat', feedback: '◉ Feedbackförfrågan skapad automatiskt',
+  nurture: '♲ Tillagd i talangpoolen', todo: '☑ To-do skapad automatiskt',
+}
+
+// Kör aktiva triggers som lyssnar på ett steg (Teamtailor-stil automation via event-bussen).
+function fireTriggers(candidateId: string, stage: StageId) {
+  for (const t of db.triggers) {
+    if (!t.active || t.when !== stage) continue
+    db.triggers = db.triggers.map(x => x.id === t.id ? { ...x, firedCount: x.firedCount + 1 } : x)
+    db.candidates = db.candidates.map(c => c.id === candidateId
+      ? { ...c, timeline: [...c.timeline, { ts: nowTs(), actor: 'Automation', text: `${TRIGGER_LABEL[t.action]}: ${t.detail}` }] }
+      : c)
+    logAudit('Trigger', `${t.action} vid ${stageLabel(stage)} — ${t.detail}`)
+  }
+}
+
 export function moveCandidate(id: string, stage: StageId) {
   db.candidates = db.candidates.map(c => {
     if (c.id !== id || c.stage === stage) return c
@@ -144,6 +188,7 @@ export function moveCandidate(id: string, stage: StageId) {
   })
   const cand = db.candidates.find(c => c.id === id)
   logAudit('Stegförflyttning', `${cand?.name} → ${stageLabel(stage)}`)
+  fireTriggers(id, stage)
 }
 
 export function rejectCandidate(id: string, reason: string, note: string) {
@@ -156,6 +201,7 @@ export function rejectCandidate(id: string, reason: string, note: string) {
     : c)
   const cand = db.candidates.find(c => c.id === id)
   logAudit('Avslag', `${cand?.name} — orsak: ${reason}`)
+  fireTriggers(id, 'avslag')
 }
 
 // ---------- Feedback ----------
@@ -324,6 +370,165 @@ export function saveSourcedToPipeline(profileId: string, roleId: string): string
   return cand.id
 }
 
+// ---------- Requisitions (godkännandekedja) ----------
+
+const currentRole = (): User['role'] | null => db.users.find(u => u.id === db.currentUserId)?.role ?? null
+
+// chef får agera proxy för ekonomi-steget (ingen egen ekonomi-inloggning i demon)
+export function canApproveStep(stepRole: ApprovalRole): boolean {
+  const r = currentRole()
+  if (stepRole === 'chef') return r === 'chef'
+  if (stepRole === 'ekonomi') return r === 'chef'
+  if (stepRole === 'ledning') return r === 'ledning'
+  return false
+}
+
+function nextPendingStep(req: Requisition) {
+  return req.steps.find(s => s.status === 'väntar')
+}
+
+export function decideRequisition(reqId: string, approve: boolean, comment: string) {
+  const req = db.requisitions.find(r => r.id === reqId)
+  if (!req) return
+  const step = nextPendingStep(req)
+  if (!step || !canApproveStep(step.role)) return
+  const ts = nowTs()
+  const decided: ApprovalStatus = approve ? 'godkänd' : 'avslagen'
+  const newSteps = req.steps.map(s => s === step
+    ? { ...s, status: decided, comment: comment || undefined, ts, approver: actor() }
+    : s)
+  const allApproved = newSteps.every(s => s.status === 'godkänd')
+  const anyRejected = newSteps.some(s => s.status === 'avslagen')
+  const status: Requisition['status'] = anyRejected ? 'avslagen' : allApproved ? 'godkänd' : 'under godkännande'
+  db.requisitions = db.requisitions.map(r => r.id === reqId ? { ...r, steps: newSteps, status } : r)
+  logAudit('Requisition', `${req.rollTitel}: ${step.role}-steget ${approve ? 'godkänt' : 'avslaget'} av ${actor()}`)
+}
+
+export function createRequisition(input: { rollTitel: string; avdelning: string; lonebudget: number; antal: number; motivering: string; planRowId?: string }): string {
+  const id = `req-${Date.now()}`
+  db.requisitions = [...db.requisitions, {
+    id, ...input, requestedBy: actor(), created: todayIso(), status: 'under godkännande',
+    steps: [
+      { role: 'chef', approver: actor(), status: 'godkänd', comment: 'Skapad och godkänd av rekryterande chef.', ts: nowTs() },
+      { role: 'ekonomi', approver: 'Karin Ahlgren', status: 'väntar' },
+      { role: 'ledning', approver: 'Viktoria Ceder', status: 'väntar' },
+    ],
+  }]
+  logAudit('Requisition', `Ny begäran: ${input.antal}× ${input.rollTitel} (${input.avdelning})`)
+  return id
+}
+
+export function openRoleFromRequisition(reqId: string): string | null {
+  const req = db.requisitions.find(r => r.id === reqId)
+  if (!req || req.status !== 'godkänd') return null
+  const id = addRole({
+    titel: req.rollTitel, chef: req.requestedBy, chefTitel: 'Rekryterande chef',
+    lonespann: `${Math.round(req.lonebudget * 0.9).toLocaleString('sv-SE')} – ${req.lonebudget.toLocaleString('sv-SE')} kr/mån`,
+    startdatum: 'snarast', mustHave: [], meriterande: [], succekriterier: [],
+  })
+  if (req.planRowId) db.plan = { ...db.plan, rows: db.plan.rows.map(r => r.id === req.planRowId ? { ...r, koppladRollId: id } : r) }
+  logAudit('Requisition', `Rollen "${req.rollTitel}" öppnad ur godkänd requisition`)
+  return id
+}
+
+// ---------- Offers med e-sign ----------
+
+export function createOffer(candidateId: string, roleId: string, lon: number, startDate: string): string {
+  const id = `od-${Date.now()}`
+  db.offerDrafts = [...db.offerDrafts, { id, candidateId, roleId, lon, startDate, status: 'utkast' }]
+  const cand = db.candidates.find(c => c.id === candidateId)
+  logAudit('Erbjudande', `Utkast skapat för ${cand?.name} (${lon.toLocaleString('sv-SE')} kr)`)
+  return id
+}
+
+export function sendOffer(offerId: string) {
+  const ts = nowTs()
+  db.offerDrafts = db.offerDrafts.map(o => o.id === offerId ? { ...o, status: 'skickat' as const, sentDate: ts.slice(0, 10) } : o)
+  const offer = db.offerDrafts.find(o => o.id === offerId)
+  if (offer) {
+    moveCandidate(offer.candidateId, 'erbjudande')
+    const cand = db.candidates.find(c => c.id === offer.candidateId)
+    logAudit('Erbjudande', `Skickat till ${cand?.name}`)
+  }
+}
+
+export function signOffer(offerId: string, signature: string) {
+  const ts = nowTs()
+  db.offerDrafts = db.offerDrafts.map(o => o.id === offerId ? { ...o, status: 'signerat' as const, signature, signedDate: ts.slice(0, 10) } : o)
+  const offer = db.offerDrafts.find(o => o.id === offerId)
+  if (offer) {
+    db.candidates = db.candidates.map(c => c.id === offer.candidateId
+      ? { ...c, timeline: [...c.timeline, { ts, actor: c.name, text: `Signerade erbjudandet (${offer.lon.toLocaleString('sv-SE')} kr/mån)` }] }
+      : c)
+    logAudit('Erbjudande', `Signerat av kandidaten`)
+  }
+}
+
+// ---------- GDPR-gallring & integrationer ----------
+
+export function runRetention(): number {
+  // Demo: "gallrar" avslagna kandidater vars samtycke gått ut (räknar bara i demon)
+  const count = db.candidates.filter(c => c.stage === 'avslag').length
+  logAudit('GDPR-gallring', `Gallringskörning genomförd — ${count} avslagna poster granskade mot gallringsregler`)
+  return count
+}
+
+export function toggleIntegration(id: string) {
+  db.integrations = db.integrations.map(i => i.id === id ? { ...i, connected: !i.connected } : i)
+  const i = db.integrations.find(x => x.id === id)
+  logAudit('Integration', `${i?.namn} ${i?.connected ? 'ansluten' : 'frånkopplad'}`)
+}
+
+// ---------- Karriärsida ----------
+
+export function updateCareerMeta(patch: Partial<Pick<CareerPage, 'accent' | 'companyName' | 'tagline'>>) {
+  db.career = { ...db.career, ...patch }
+}
+
+export function updateCareerBlock(blockId: string, patch: Partial<CareerBlock>) {
+  db.career = { ...db.career, blocks: db.career.blocks.map(b => b.id === blockId ? { ...b, ...patch } : b) }
+}
+
+export function moveCareerBlock(blockId: string, dir: -1 | 1) {
+  const blocks = [...db.career.blocks]
+  const i = blocks.findIndex(b => b.id === blockId)
+  const j = i + dir
+  if (i < 0 || j < 0 || j >= blocks.length) return
+  ;[blocks[i], blocks[j]] = [blocks[j], blocks[i]]
+  db.career = { ...db.career, blocks }
+}
+
+export function publishCareer(published: boolean) {
+  db.career = { ...db.career, published }
+  logAudit('Karriärsida', published ? 'Publicerad' : 'Avpublicerad')
+}
+
+// ---------- Triggers & nurture ----------
+
+export function toggleTrigger(id: string) {
+  db.triggers = db.triggers.map(t => t.id === id ? { ...t, active: !t.active } : t)
+  const t = db.triggers.find(x => x.id === id)
+  logAudit('Trigger', `${t?.active ? 'Aktiverad' : 'Inaktiverad'}: ${t?.detail}`)
+}
+
+export function addTrigger(when: StageId, action: TriggerAction, detail: string) {
+  const id = `tr-${db.triggers.length + 1}-${Date.now()}`
+  db.triggers = [...db.triggers, { id, when, action, detail, active: true, firedCount: 0 }]
+  logAudit('Trigger', `Ny regel: vid ${stageLabel(when)} → ${action}`)
+}
+
+export function toggleNurture(id: string) {
+  db.nurture = db.nurture.map(n => n.id === id ? { ...n, aktiv: !n.aktiv } : n)
+}
+
+export function sendNurture(id: string) {
+  db.nurture = db.nurture.map(n => n.id === id
+    ? { ...n, utskick: n.utskick + 1, oppningar: n.oppningar + Math.max(1, Math.round(n.medlemmar * 0.6)) }
+    : n)
+  const n = db.nurture.find(x => x.id === id)
+  logAudit('Nurture', `Utskick till "${n?.namn}" (${n?.medlemmar} mottagare)`)
+}
+
 // ---------- Headhunt-länkar ----------
 
 const slugName = (name: string) =>
@@ -347,18 +552,19 @@ export function applyViaHeadhunt(linkId: string, roleId: string, name: string, n
   const effectiveRole = link?.roleId ?? roleId
   if (!db.roles.some(r => r.id === effectiveRole)) return null
   const ts = nowTs()
-  const id = `hh-${Date.now()}`
+  const id = `pub-${Date.now()}`
   const cand: Candidate = {
-    id, name: name.trim() || 'Anonym sökande', roleId: effectiveRole, source: 'Headhunt',
+    id, name: name.trim() || 'Anonym sökande', roleId: effectiveRole, source: link ? 'Headhunt' : 'Karriärsida',
     appliedDate: ts.slice(0, 10), stage: 'nya', daysInStage: 0,
-    cvSummary: note.trim() || 'Sökte via en headhunt-länk. Ingen ytterligare info angiven ännu.',
+    cvSummary: note.trim() || 'Sökte via den publika jobbsidan. Ingen ytterligare info angiven ännu.',
     email: `${slugName(name || 'sokande')}@mail.se`, phone: '—', gdprConsentUntil: '2027-12-31',
     headhuntLinkId: link ? linkId : undefined,
-    timeline: [{ ts, actor: 'System', text: link ? `Ansökan via headhunt-länk (${linkId}, ${link.recruiter})` : 'Ansökan via publik jobbsida' }],
+    timeline: [{ ts, actor: 'System', text: link ? `Ansökan via headhunt-länk (${linkId}, ${link.recruiter})` : 'Ansökan via karriärsidan' }],
     scorecards: [],
   }
   db.candidates = [...db.candidates, cand]
-  logAudit('Headhunt-ansökan', `${cand.name} → ${roleTitle(effectiveRole)}${link ? ` (via ${link.recruiter})` : ''}`)
+  logAudit(link ? 'Headhunt-ansökan' : 'Karriärsida-ansökan', `${cand.name} → ${roleTitle(effectiveRole)}${link ? ` (via ${link.recruiter})` : ''}`)
+  fireTriggers(id, 'nya')
   return id
 }
 

@@ -860,6 +860,72 @@ export const CANDIDATES: Candidate[] = [
   },
 ]
 
+// ---------- Requisitions, integrationer (Fas 7) ----------
+
+export const REQUISITIONS: import('./types').Requisition[] = [
+  {
+    id: 'req-saljare', rollTitel: 'Account Manager', avdelning: 'Sälj', planRowId: 'p-saljare',
+    lonebudget: 45000, antal: 2, motivering: 'Expansion mot nya marknaden kräver två säljare för att nå Q1-målet.',
+    requestedBy: 'Peter Sandell', created: '2026-07-01',
+    status: 'under godkännande',
+    steps: [
+      { role: 'chef', approver: 'Peter Sandell', status: 'godkänd', comment: 'Prioriterat för tillväxtplanen.', ts: '2026-07-01 14:00' },
+      { role: 'ekonomi', approver: 'Karin Ahlgren', status: 'väntar' },
+      { role: 'ledning', approver: 'Viktoria Ceder', status: 'väntar' },
+    ],
+  },
+  {
+    id: 'req-devops', rollTitel: 'DevOps-ingenjör', avdelning: 'Utveckling',
+    lonebudget: 64000, antal: 1, motivering: 'Driftbelastningen har ökat 40% — vi behöver dedikerad DevOps innan Q4.',
+    requestedBy: 'Marcus Öhrn', created: '2026-06-28',
+    status: 'under godkännande',
+    steps: [
+      { role: 'chef', approver: 'Marcus Öhrn', status: 'godkänd', comment: 'Kritiskt för driftstabiliteten.', ts: '2026-06-28 09:30' },
+      { role: 'ekonomi', approver: 'Karin Ahlgren', status: 'godkänd', comment: 'Ryms i utvecklingsbudgeten.', ts: '2026-06-30 11:00' },
+      { role: 'ledning', approver: 'Viktoria Ceder', status: 'väntar' },
+    ],
+  },
+]
+
+export const INTEGRATIONS: import('./types').Integration[] = [
+  { id: 'slack', namn: 'Slack', ikon: '💬', kategori: 'Notiser', connected: true },
+  { id: 'teams', namn: 'Microsoft Teams', ikon: '👥', kategori: 'Notiser', connected: false },
+  { id: 'bankid', namn: 'BankID', ikon: '🆔', kategori: 'Signering', connected: true },
+  { id: 'linkedin', namn: 'LinkedIn', ikon: '🔗', kategori: 'Sourcing', connected: true },
+  { id: 'fortnox', namn: 'Fortnox Lön', ikon: '💰', kategori: 'Lön & HR', connected: false },
+  { id: 'workday', namn: 'Workday HRIS', ikon: '🗂️', kategori: 'Lön & HR', connected: false },
+  { id: 'gcal', namn: 'Google Kalender', ikon: '📅', kategori: 'Schemaläggning', connected: true },
+  { id: 'sanalytics', namn: 'GA4', ikon: '📊', kategori: 'Analys', connected: false },
+]
+
+// ---------- Karriärsida (Teamtailor-stil) ----------
+
+export const CAREER_PAGE: import('./types').CareerPage = {
+  accent: '#1F5C46',
+  companyName: 'Bolaget AB',
+  tagline: 'Vi bygger framtidens verktyg — kom och bygg med oss.',
+  published: false,
+  blocks: [
+    { id: 'b-hero', type: 'hero', enabled: true, title: 'Jobba hos Bolaget AB', text: 'Ett team som sätter människor först och data nära besluten. Här får du äga din leverans från dag ett.' },
+    { id: 'b-about', type: 'about', enabled: true, title: 'Om oss', text: 'Vi är ett produktbolag i Stockholm med 80 personer och kort väg mellan idé och lansering. Vår kultur bygger på tydliga mål, coachande ledarskap och transparens.' },
+    { id: 'b-benefits', type: 'benefits', enabled: true, title: 'Förmåner', items: ['30 dagars semester', 'Tjänstepension + friskvård 5 000 kr', 'Hybridarbete & flexibel tid', 'Kompetensutveckling 20 000 kr/år', 'Föräldralön upp till 6 mån'] },
+    { id: 'b-jobs', type: 'jobs', enabled: true, title: 'Lediga tjänster' },
+    { id: 'b-quote', type: 'quote', enabled: true, text: 'Jag fick ansvar på riktigt redan första månaden — och stöd hela vägen.', author: 'Ida Månsson, Redovisningsekonom' },
+  ],
+}
+
+export const TRIGGERS: import('./types').TriggerRule[] = [
+  { id: 'tr-1', when: 'intervju', action: 'mail', detail: 'Skicka bekräftelsemail med tid & plats till kandidaten', active: true, firedCount: 12 },
+  { id: 'tr-2', when: 'case', action: 'feedback', detail: 'Begär scorecard från rekryterande chef automatiskt', active: true, firedCount: 8 },
+  { id: 'tr-3', when: 'avslag', action: 'nurture', detail: 'Lägg starka avslag i talangpoolen för framtida roller', active: true, firedCount: 5 },
+  { id: 'tr-4', when: 'slutintervju', action: 'todo', detail: 'Skapa to-do: boka referenstagning', active: false, firedCount: 0 },
+]
+
+export const NURTURE_CAMPAIGNS: import('./types').NurtureCampaign[] = [
+  { id: 'nc-1', namn: 'Starka avslag — utveckling', audience: 'Backend-kandidater med score ≥ 4,0', medlemmar: 6, utskick: 3, oppningar: 5, aktiv: true },
+  { id: 'nc-2', namn: 'Tackade nej — håll kontakten', audience: 'Kandidater som tackat nej senaste året', medlemmar: 4, utskick: 2, oppningar: 3, aktiv: true },
+]
+
 // ---------- Headhunt-länkar (spårbar attribution) ----------
 
 export const HEADHUNT_LINKS: import('./types').HeadhuntLink[] = [
@@ -1146,6 +1212,8 @@ export const DATA_BADGES: { prefix: string; skapas: string[] }[] = [
   { prefix: '/sourcing', skapas: ['sammanslagna webbprofiler (GitHub/portfölj/forskning)', 'confidence per fält', 'matchpoäng mot kravprofil', 'källa: AI-sourcing vid sparning'] },
   { prefix: '/inbox', skapas: ['outreach-meddelanden (mail/linkedin/sms)', 'sekvenssteg & svarstatus', 'trådkoppling kandidat+roll', 'stegförflyttning från tråd'] },
   { prefix: '/headhunt', skapas: ['spårbara länkar per rekryterare×roll', 'klick & unika besök', 'attribuerade ansökningar', 'leaderboard-underlag'] },
+  { prefix: '/karriarsida', skapas: ['karriärsidans block & tema', 'publiceringsstatus', 'triggerregler (NÄR→DÅ)', 'nurture-kampanjer & talangpool'] },
+  { prefix: '/compliance', skapas: ['append-only audit-logg', 'AI-beslut & förklaringar', 'gallringskörningar (GDPR)', 'integrationsstatus'] },
   { prefix: '/ledningsfragor', skapas: ['inga — board-ready svar konsumeras ur pipelinen'] },
   { prefix: '/roller', skapas: ['kravprofil (must-have, meriterande)', 'succékriterier', 'lönespann & startdatum', 'intervjuplan & scorecard-mallar', 'kanalkostnader'] },
   { prefix: '/kandidater', skapas: ['stegförflyttning', 'tidsstämpel & aktör', 'avslagsorsak (obligatorisk)', 'källkanal', 'GDPR-samtycke'] },

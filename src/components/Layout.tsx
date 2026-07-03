@@ -11,13 +11,16 @@ const NAV: { to: string; ico: string; label: string; needs?: Permission }[] = [
   { to: '/', ico: '◫', label: 'Översikt' },
   { to: '/planering', ico: '▦', label: 'Planering' },
   { to: '/roller', ico: '▤', label: 'Roller' },
+  { to: '/requisitions', ico: '✍', label: 'Requisitions', needs: 'exec.view' },
   { to: '/sourcing', ico: '🔍', label: 'AI-sourcing', needs: 'operate' },
   { to: '/headhunt', ico: '🎯', label: 'Headhunt-länkar' },
+  { to: '/karriarsida', ico: '🎨', label: 'Karriärsida', needs: 'operate' },
   { to: '/kandidater', ico: '⋮⋮', label: 'Kandidater' },
   { to: '/inbox', ico: '📨', label: 'Inkorg', needs: 'operate' },
   { to: '/feedback', ico: '◉', label: 'Feedback' },
   { to: '/erbjudanden', ico: '✓', label: 'Erbjudanden' },
   { to: '/analys', ico: '∿', label: 'Analys' },
+  { to: '/compliance', ico: '🛡', label: 'Compliance', needs: 'audit.view' },
   { to: '/ledningsfragor', ico: '❖', label: 'Ledningsfrågor', needs: 'exec.view' },
 ]
 

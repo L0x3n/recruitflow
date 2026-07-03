@@ -3,7 +3,9 @@
 
 import { call } from './client'
 import * as server from './server'
-import type { AppSettings, PlanRow, Profile, ScorecardCriterion, StageId, TeamMember } from '../types'
+import type {
+  AppSettings, CareerBlock, CareerPage, PlanRow, Profile, ScorecardCriterion, StageId, TeamMember, TriggerAction,
+} from '../types'
 import type { NewRoleInput } from './server'
 
 export type { NewRoleInput, Snapshot } from './server'
@@ -42,6 +44,36 @@ export const api = {
     createLink: (roleId: string) => call(() => server.createHeadhuntLink(roleId)),
     registerClick: (linkId: string) => call(() => server.registerHeadhuntClick(linkId), { bypassFail: true }),
     apply: (linkId: string, roleId: string, name: string, note: string) => call(() => server.applyViaHeadhunt(linkId, roleId, name, note)),
+  },
+  career: {
+    updateMeta: (patch: Partial<Pick<CareerPage, 'accent' | 'companyName' | 'tagline'>>) => call(() => server.updateCareerMeta(patch)),
+    updateBlock: (blockId: string, patch: Partial<CareerBlock>) => call(() => server.updateCareerBlock(blockId, patch)),
+    moveBlock: (blockId: string, dir: -1 | 1) => call(() => server.moveCareerBlock(blockId, dir)),
+    publish: (published: boolean) => call(() => server.publishCareer(published)),
+  },
+  triggers: {
+    toggle: (id: string) => call(() => server.toggleTrigger(id)),
+    add: (when: StageId, action: TriggerAction, detail: string) => call(() => server.addTrigger(when, action, detail)),
+  },
+  nurture: {
+    toggle: (id: string) => call(() => server.toggleNurture(id)),
+    send: (id: string) => call(() => server.sendNurture(id)),
+  },
+  requisitions: {
+    decide: (reqId: string, approve: boolean, comment: string) => call(() => server.decideRequisition(reqId, approve, comment)),
+    create: (input: { rollTitel: string; avdelning: string; lonebudget: number; antal: number; motivering: string; planRowId?: string }) => call(() => server.createRequisition(input)),
+    openRole: (reqId: string) => call(() => server.openRoleFromRequisition(reqId)),
+  },
+  offerDrafts: {
+    create: (candidateId: string, roleId: string, lon: number, startDate: string) => call(() => server.createOffer(candidateId, roleId, lon, startDate)),
+    send: (offerId: string) => call(() => server.sendOffer(offerId)),
+    sign: (offerId: string, signature: string) => call(() => server.signOffer(offerId, signature)),
+  },
+  compliance: {
+    runRetention: () => call(() => server.runRetention()),
+  },
+  integrations: {
+    toggle: (id: string) => call(() => server.toggleIntegration(id)),
   },
   users: {
     updateProfile: (p: Profile) => call(() => server.updateProfile(p)),

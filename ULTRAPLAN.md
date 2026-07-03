@@ -10,8 +10,12 @@
 - ✅ **Etapp 2 (Fas 3–5)** — AI-sourcing (deep search → smart profiling → förklarbar match → pipeline),
   outreach-sekvenser + joint inbox + Rita-assistent, headhunt-länkar med attribution + leaderboard +
   publik jobbsida (/jobb?hh=).
-- ⏭️ **Kvar: Etapp 3 (Fas 6–7)** karriärsidebyggare/triggers/nurture + requisitions/offers/compliance,
-  **Etapp 4 (Fas 8–9)** rapportbyggare/copilot-Q&A + datapipeline v2/polish.
+- ✅ **Etapp 3 (Fas 6–7)** — Teamtailor-ytan: karriärsidebyggare (block/tema/publicera) + publik /karriar
+  m. ansök-flöde, triggers (NÄR steg→DÅ mail/feedback/nurture/todo) som kör vid stegflytt, talangpool +
+  nurture. SmartRecruiters-styrningen: requisitions m. godkännandekedja (chef→ekonomi→ledning) +
+  budgetkoll + öppna-roll, offers m. lön-validering + e-sign (canvas-signatur), compliance-center
+  (audit/AI-transparens/GDPR-gallring/marketplace-integrationer).
+- ⏭️ **Kvar: Etapp 4 (Fas 8–9)** rapportbyggare/copilot-Q&A + datapipeline-karta v2 + polish.
 
 ---
 

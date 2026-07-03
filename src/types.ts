@@ -72,6 +72,99 @@ export interface HeadhuntLink {
   clicks: number
 }
 
+// ---------- Fas 6: karriärsida ----------
+
+export type BlockType = 'hero' | 'about' | 'benefits' | 'jobs' | 'quote'
+
+export interface CareerBlock {
+  id: string
+  type: BlockType
+  enabled: boolean
+  title?: string
+  text?: string
+  items?: string[]
+  author?: string
+}
+
+export interface CareerPage {
+  accent: string
+  companyName: string
+  tagline: string
+  blocks: CareerBlock[]
+  published: boolean
+}
+
+// ---------- Fas 6: triggers & nurture ----------
+
+export type TriggerAction = 'mail' | 'feedback' | 'nurture' | 'todo'
+
+export interface TriggerRule {
+  id: string
+  when: StageId
+  action: TriggerAction
+  detail: string // mall/ämne/beskrivning
+  active: boolean
+  firedCount: number
+}
+
+export interface NurtureCampaign {
+  id: string
+  namn: string
+  audience: string
+  medlemmar: number
+  utskick: number
+  oppningar: number
+  aktiv: boolean
+}
+
+// ---------- Fas 7: requisitions, offers, compliance, marketplace ----------
+
+export type ApprovalRole = 'chef' | 'ekonomi' | 'ledning'
+export type ApprovalStatus = 'väntar' | 'godkänd' | 'avslagen'
+
+export interface ApprovalStep {
+  role: ApprovalRole
+  approver: string
+  status: ApprovalStatus
+  comment?: string
+  ts?: string
+}
+
+export interface Requisition {
+  id: string
+  rollTitel: string
+  avdelning: string
+  planRowId?: string
+  lonebudget: number
+  antal: number
+  motivering: string
+  requestedBy: string
+  created: string
+  steps: ApprovalStep[]
+  status: 'under godkännande' | 'godkänd' | 'avslagen'
+}
+
+export interface OfferDraft {
+  id: string
+  candidateId: string
+  roleId: string
+  lon: number
+  startDate: string
+  status: 'utkast' | 'skickat' | 'signerat'
+  sentDate?: string
+  signature?: string // dataURL av ritad signatur
+  signedDate?: string
+}
+
+export interface Integration {
+  id: string
+  namn: string
+  ikon: string
+  kategori: string
+  connected: boolean
+}
+
+
 export interface AdChannel {
   kanal: string
   kostnad: number

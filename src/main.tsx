@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { Analys } from './pages/Analys'
+import { CareerBuilder } from './pages/CareerBuilder'
+import { Compliance } from './pages/Compliance'
 import { Datapipeline } from './pages/Datapipeline'
 import { Erbjudanden } from './pages/Erbjudanden'
 import { FeedbackPage } from './pages/Feedback'
@@ -14,6 +16,8 @@ import { Ledningsfragor } from './pages/Ledningsfragor'
 import { Login } from './pages/Login'
 import { Oversikt } from './pages/Oversikt'
 import { Planering } from './pages/Planering'
+import { Requisitions } from './pages/Requisitions'
+import { PublicCareer } from './pages/PublicCareer'
 import { PublicJob } from './pages/PublicJob'
 import { Roller } from './pages/Roller'
 import { Sourcing } from './pages/Sourcing'
@@ -24,8 +28,9 @@ function Root() {
   const { currentUser } = useStore()
   return (
     <Routes>
-      {/* Publik jobbsida — ingen inloggning, nås via headhunt-länk */}
+      {/* Publika sidor — ingen inloggning */}
       <Route path="/jobb" element={<PublicJob />} />
+      <Route path="/karriar" element={<PublicCareer />} />
       {currentUser ? (
         <Route element={<Layout />}>
           <Route path="/" element={<Oversikt />} />
@@ -33,6 +38,9 @@ function Root() {
           <Route path="/ledningsfragor" element={<Ledningsfragor />} />
           <Route path="/sourcing" element={<Sourcing />} />
           <Route path="/headhunt" element={<Headhunt />} />
+          <Route path="/karriarsida" element={<CareerBuilder />} />
+          <Route path="/requisitions" element={<Requisitions />} />
+          <Route path="/compliance" element={<Compliance />} />
           <Route path="/roller" element={<Roller />} />
           <Route path="/roller/:roleId" element={<Roller />} />
           <Route path="/kandidater" element={<Kandidater />} />
