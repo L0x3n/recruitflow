@@ -13,6 +13,7 @@ import { Login } from './pages/Login'
 import { Oversikt } from './pages/Oversikt'
 import { Planering } from './pages/Planering'
 import { Roller } from './pages/Roller'
+import { Sourcing } from './pages/Sourcing'
 import { StoreProvider, useStore } from './store'
 import './styles.css'
 
@@ -25,6 +26,7 @@ function Root() {
         <Route path="/" element={<Oversikt />} />
         <Route path="/planering" element={<Planering />} />
         <Route path="/ledningsfragor" element={<Ledningsfragor />} />
+        <Route path="/sourcing" element={<Sourcing />} />
         <Route path="/roller" element={<Roller />} />
         <Route path="/roller/:roleId" element={<Roller />} />
         <Route path="/kandidater" element={<Kandidater />} />

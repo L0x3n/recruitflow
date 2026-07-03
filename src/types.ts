@@ -12,7 +12,7 @@ export type StageId =
   | 'anstalld'
   | 'avslag'
 
-export type Source = 'LinkedIn' | 'Referral' | 'Arbetsförmedlingen' | 'Karriärsida' | 'Search'
+export type Source = 'LinkedIn' | 'Referral' | 'Arbetsförmedlingen' | 'Karriärsida' | 'Search' | 'AI-sourcing' | 'Headhunt'
 
 export interface TimelineEvent {
   ts: string
@@ -199,6 +199,42 @@ export interface AuditEvent {
 
 export interface AppSettings {
   apiFel: boolean
+}
+
+// ---------- Fas 3: AI-sourcing (Talentium-stil) ----------
+
+export type FragmentSource =
+  | 'GitHub' | 'Portfölj' | 'Konferens' | 'Forskning' | 'LinkedIn' | 'Blogg' | 'Stack Overflow' | 'Meetup' | 'Dribbble'
+
+export interface ProfileFragment {
+  source: FragmentSource
+  detail: string
+  confidence: number // 0–100
+}
+
+export interface SourcedProfile {
+  id: string
+  name: string
+  title: string
+  location: string
+  summary: string
+  skills: string[]
+  growthSignals: string[]
+  fragments: ProfileFragment[]
+  years: number
+  openToWork: number // 0–100 sannolikhet att vara öppen för nytt
+  tags: string[] // fritt sökbara nyckelord (stack, domän, ort)
+}
+
+export interface MatchContribution {
+  label: string
+  delta: number // +/- poängbidrag
+  reason: string
+}
+
+export interface MatchResult {
+  score: number // 0–100
+  contributions: MatchContribution[]
 }
 
 export interface Notification {

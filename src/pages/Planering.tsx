@@ -11,29 +11,64 @@ const PROGNOS_CLASS: Record<string, string> = {
   'klar': 'chip', 'i fas': 'chip', 'risk': 'chip warn', 'efter plan': 'chip danger', 'ej startad': 'chip gray',
 }
 
-// ---------- CSV ----------
+// ---------- Import (CSV + Excel/.xlsx) ----------
 
-const CSV_TEMPLATE = [
-  'avdelning;roll;antal;lonebudget;rekrbudget;kvartal;malstart;ansvarig;kompetenser',
-  'Marknad;Marknadskoordinator;1;42000;25000;Q4 2026;2026-11-01;Sofia Renberg;SEO/Content',
-  'Utveckling;Data engineer;2;60000;55000;Q1 2027;2027-02-01;Eva Lindqvist;Python/SQL/dbt',
-].join('\n')
+const TEMPLATE_ROWS = [
+  ['avdelning', 'roll', 'antal', 'lonebudget', 'rekrbudget', 'kvartal', 'malstart', 'ansvarig', 'kompetenser'],
+  ['Marknad', 'Marknadskoordinator', '1', '42000', '25000', 'Q4 2026', '2026-11-01', 'Sofia Renberg', 'SEO/Content'],
+  ['Utveckling', 'Data engineer', '2', '60000', '55000', 'Q1 2027', '2027-02-01', 'Eva Lindqvist', 'Python/SQL/dbt'],
+]
 
-interface ParsedCsv { headers: string[]; rows: string[][] }
+interface ParsedSheet { headers: string[]; rows: string[][]; sheetNames?: string[] }
 
-function parseCsv(text: string): ParsedCsv {
-  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
+// Excel-datumcell → ISO (yyyy-mm-dd), tidszonssäkert (annars kan datum glida en dag).
+function fmtDate(d: Date): string {
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
+}
+
+// Array-of-arrays → headers + rader. Hoppar över tomma inledande rader
+// (vanligt i Excel-planer med logga/rubrik högst upp).
+function normalizeAoa(aoa: unknown[][]): ParsedSheet {
+  const clean = aoa.map(r => (r ?? []).map(c => {
+    if (c == null) return ''
+    if (c instanceof Date) return fmtDate(c)
+    return String(c).trim()
+  }))
+  const headerIdx = clean.findIndex(r => r.filter(c => c !== '').length >= 2)
+  if (headerIdx < 0) return { headers: [], rows: [] }
+  const headers = clean[headerIdx]
+  const rows = clean.slice(headerIdx + 1).filter(r => r.some(c => c !== ''))
+  return { headers, rows }
+}
+
+function parseCsv(text: string): ParsedSheet {
+  const lines = text.split(/\r?\n/).filter(l => l.trim())
   if (!lines.length) return { headers: [], rows: [] }
   const delim = (lines[0].match(/;/g)?.length ?? 0) >= (lines[0].match(/,/g)?.length ?? 0) ? ';' : ','
   const split = (l: string) => l.split(delim).map(c => c.trim().replace(/^"|"$/g, ''))
-  return { headers: split(lines[0]), rows: lines.slice(1).map(split) }
+  return normalizeAoa(lines.map(split))
+}
+
+const isExcel = (name: string) => /\.(xlsx|xls|xlsm)$/i.test(name)
+
+// SheetJS laddas lazy (dynamisk import) → hålls utanför huvudbundlen.
+async function parseExcel(file: File, sheetName?: string): Promise<ParsedSheet> {
+  const XLSX = await import('xlsx')
+  const wb = XLSX.read(await file.arrayBuffer(), { cellDates: true })
+  const names = wb.SheetNames
+  const pick = sheetName && names.includes(sheetName) ? sheetName : names[0]
+  // raw:true → datumceller kommer som Date-objekt (formateras i normalizeAoa), tal som tal.
+  const aoa = XLSX.utils.sheet_to_json(wb.Sheets[pick], {
+    header: 1, raw: true, defval: '',
+  }) as unknown[][]
+  return { ...normalizeAoa(aoa), sheetNames: names }
 }
 
 const num = (s: string) => Number(s.replace(/[^\d]/g, '')) || 0
 
 const FIELDS: { key: string; label: string; guess: RegExp }[] = [
   { key: 'avdelning', label: 'Avdelning', guess: /avdelning|department|team/i },
-  { key: 'rollTitel', label: 'Roll', guess: /roll|titel|title|position/i },
+  { key: 'rollTitel', label: 'Roll', guess: /roll|titel|title|position|befattning|tjänst|namn/i },
   { key: 'antal', label: 'Antal', guess: /antal|headcount|count|hc/i },
   { key: 'lonebudget', label: 'Lönebudget (kr/mån)', guess: /l[oö]n|salary/i },
   { key: 'rekrbudget', label: 'Rekryteringsbudget (kr)', guess: /rekr|recruit|budget/i },
@@ -44,17 +79,17 @@ const FIELDS: { key: string; label: string; guess: RegExp }[] = [
 ]
 
 function ImportTab() {
-  const { addPlanRows } = useStore()
-  const [parsed, setParsed] = useState<ParsedCsv | null>(null)
+  const { addPlanRows, toast } = useStore()
+  const [parsed, setParsed] = useState<ParsedSheet | null>(null)
   const [mapping, setMapping] = useState<Record<string, number>>({})
   const [done, setDone] = useState<number | null>(null)
+  const [file, setFile] = useState<File | null>(null)
+  const [activeSheet, setActiveSheet] = useState<string>('')
+  const [loading, setLoading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const onFile = async (f: File) => {
-    const text = await f.text()
-    const p = parseCsv(text)
+  const applyParsed = (p: ParsedSheet) => {
     setParsed(p)
-    setDone(null)
     const auto: Record<string, number> = {}
     FIELDS.forEach(field => {
       const i = p.headers.findIndex(h => field.guess.test(h))
@@ -63,13 +98,40 @@ function ImportTab() {
     setMapping(auto)
   }
 
-  const downloadTemplate = () => {
-    const blob = new Blob(['﻿' + CSV_TEMPLATE], { type: 'text/csv;charset=utf-8' })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = 'planeringsmall.csv'
-    a.click()
-    URL.revokeObjectURL(a.href)
+  const onFile = async (f: File) => {
+    setDone(null)
+    setFile(f)
+    setActiveSheet('')
+    try {
+      if (isExcel(f.name)) {
+        setLoading(true)
+        const p = await parseExcel(f)
+        setActiveSheet(p.sheetNames?.[0] ?? '')
+        applyParsed(p)
+      } else {
+        applyParsed(parseCsv(await f.text()))
+      }
+    } catch {
+      toast('Kunde inte läsa filen — kontrollera att det är en giltig CSV eller Excel-fil')
+      setParsed(null)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const switchSheet = async (name: string) => {
+    if (!file) return
+    setActiveSheet(name)
+    setLoading(true)
+    try { applyParsed(await parseExcel(file, name)) } finally { setLoading(false) }
+  }
+
+  const downloadTemplate = async () => {
+    const XLSX = await import('xlsx')
+    const ws = XLSX.utils.aoa_to_sheet(TEMPLATE_ROWS)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Plan 2026')
+    XLSX.writeFile(wb, 'planeringsmall.xlsx')
   }
 
   const ready = parsed && ['avdelning', 'rollTitel', 'antal'].every(k => mapping[k] !== undefined)
@@ -90,27 +152,41 @@ function ImportTab() {
       prioritet: 'normal',
     }))
     const n = await addPlanRows(rows)
-    if (n !== null) { setDone(n); setParsed(null); if (fileRef.current) fileRef.current.value = '' }
+    if (n !== null) { setDone(n); setParsed(null); setFile(null); if (fileRef.current) fileRef.current.value = '' }
   }
 
   return (
     <div className="grid" style={{ gap: 14 }}>
       <div className="banner-ok">
-        ✦ Migreringen bort från Excel: importera er befintliga planeringsfil EN gång — sedan bor planen här,
-        kopplad till live-pipelinen i stället för döda celler.
+        ✦ Migreringen bort från Excel: dra in er befintliga .xlsx-plan direkt — vi läser flikar, rubriker och datum
+        automatiskt. Importera EN gång, sedan bor planen här kopplad till live-pipelinen i stället för döda celler.
       </div>
       <div className="card">
-        <h3 style={{ marginBottom: 10 }}>1. Välj fil (CSV — spara om er Excel som .csv)</h3>
+        <h3 style={{ marginBottom: 10 }}>1. Välj fil — Excel (.xlsx/.xls) eller CSV</h3>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <input
             ref={fileRef}
             type="file"
-            accept=".csv,.txt"
+            accept=".csv,.txt,.xlsx,.xls,.xlsm"
             data-testid="csv-input"
             onChange={e => e.target.files?.[0] && onFile(e.target.files[0])}
           />
-          <button className="btn small" onClick={downloadTemplate}>⤓ Ladda ner mall-CSV</button>
+          <button className="btn small" onClick={downloadTemplate}>⤓ Ladda ner Excel-mall</button>
+          {loading && <span className="muted small">Läser filen…</span>}
         </div>
+        {file && isExcel(file.name) && parsed?.sheetNames && parsed.sheetNames.length > 1 && (
+          <div style={{ marginTop: 10 }}>
+            <label className="small muted">Flik i arbetsboken</label>
+            <select
+              className="editable-input mini-select"
+              value={activeSheet}
+              onChange={e => switchSheet(e.target.value)}
+              data-testid="sheet-select"
+            >
+              {parsed.sheetNames.map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+        )}
         {done !== null && <div className="banner-ok" style={{ marginTop: 10 }}>✓ {done} rader importerade till planen.</div>}
       </div>
 

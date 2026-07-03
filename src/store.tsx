@@ -83,6 +83,7 @@ interface Store {
   plan: Snapshot['plan']
   scenarios: Snapshot['scenarios']
   warningAcks: Snapshot['warningAcks']
+  savedSourced: Snapshot['savedSourced']
   audit: Snapshot['audit']
   settings: AppSettings
   // härlett
@@ -105,6 +106,7 @@ interface Store {
   remindFeedback: (requestId: string) => void
   remindOffer: (offerId: string) => void
   addRole: (input: NewRoleInput) => Promise<string | null>
+  saveSourced: (profileId: string, roleId: string) => Promise<string | null>
   updateProfile: (p: Profile) => void
   addMember: (m: TeamMember) => void
   // WFP
@@ -217,6 +219,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     run(() => api.postings.create(input), `Rollen "${input.titel}" skapad — kravprofilen är måttstocken`),
   [run])
 
+  const saveSourced = useCallback(async (profileId: string, roleId: string) =>
+    run(() => api.sourcing.saveToPipeline(profileId, roleId), 'Profil sparad till pipelinen — källa: AI-sourcing'),
+  [run])
+
   const updateProfile = useCallback((p: Profile) => {
     void run(() => api.users.updateProfile(p), 'Profil uppdaterad')
   }, [run])
@@ -257,18 +263,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     candidates: snap.candidates, roles: snap.roles, feedback: snap.feedback, offers: snap.offers,
     team: snap.team, users: snap.users, currentUser: snap.currentUser,
     plan: snap.plan, scenarios: snap.scenarios, warningAcks: snap.warningAcks,
-    audit: snap.audit, settings: snap.settings,
+    savedSourced: snap.savedSourced, audit: snap.audit, settings: snap.settings,
     byId, roleTitleOf, profile, can, planStatuses, warnings,
     login, logout,
     moveCandidate, rejectTarget, requestReject, confirmReject, cancelReject,
-    answerFeedback, remindFeedback, remindOffer, addRole, updateProfile, addMember,
+    answerFeedback, remindFeedback, remindOffer, addRole, saveSourced, updateProfile, addMember,
     updatePlanRow, addPlanRows, deletePlanRow, createScenario, updateScenarioRow, deleteScenario,
     ackWarning, setSetting,
     toasts, toast, tourStep, startTour, setTourStep,
   }), [
     snap, byId, roleTitleOf, profile, can, planStatuses, warnings, login, logout,
     moveCandidate, rejectTarget, requestReject, confirmReject, cancelReject,
-    answerFeedback, remindFeedback, remindOffer, addRole, updateProfile, addMember,
+    answerFeedback, remindFeedback, remindOffer, addRole, saveSourced, updateProfile, addMember,
     updatePlanRow, addPlanRows, deletePlanRow, createScenario, updateScenarioRow, deleteScenario,
     ackWarning, setSetting, toasts, toast, tourStep, startTour,
   ])

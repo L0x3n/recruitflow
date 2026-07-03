@@ -11,6 +11,7 @@ const NAV: { to: string; ico: string; label: string; needs?: Permission }[] = [
   { to: '/', ico: '◫', label: 'Översikt' },
   { to: '/planering', ico: '▦', label: 'Planering' },
   { to: '/roller', ico: '▤', label: 'Roller' },
+  { to: '/sourcing', ico: '🔍', label: 'AI-sourcing', needs: 'operate' },
   { to: '/kandidater', ico: '⋮⋮', label: 'Kandidater' },
   { to: '/feedback', ico: '◉', label: 'Feedback' },
   { to: '/erbjudanden', ico: '✓', label: 'Erbjudanden' },

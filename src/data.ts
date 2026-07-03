@@ -1,5 +1,5 @@
 import type {
-  Candidate, FeedbackRequest, Notification, Offer, PlanRow, Role, Scorecard, StageId, TimelineEvent, User,
+  Candidate, FeedbackRequest, Notification, Offer, PlanRow, Role, Scorecard, SourcedProfile, StageId, TimelineEvent, User,
 } from './types'
 
 // ---------- Användare (mock-inlogg) ----------
@@ -184,6 +184,139 @@ export const ROLES: Role[] = [
 
 export const roleTitle = (roleId: string) =>
   ROLES.find(r => r.id === roleId)?.titel ?? 'Tidigare rekrytering'
+
+// ---------- AI-sourcing: profiler funna "över hela webben" ----------
+
+export const SOURCED_POOL: SourcedProfile[] = [
+  {
+    id: 's-noa', name: 'Noa Lindqvist', title: 'Senior Backend Engineer', location: 'Stockholm',
+    summary: 'Bygger distribuerade Node.js-tjänster i fintech, aktiv open source-bidragare till TypeScript-ekosystemet. Har skalat en betalplattform från 0 till 2 M användare.',
+    skills: ['TypeScript', 'Node.js', 'Kafka', 'PostgreSQL', 'AWS', 'Kubernetes'],
+    growthSignals: ['Gick från utvecklare till teamlead på 18 mån', 'Talare på Node Congress 2025', 'Underhåller ett npm-paket med 40k veckonedladdningar'],
+    fragments: [
+      { source: 'GitHub', detail: '58 publika repos, mest TypeScript & Go, 1.2k stjärnor totalt', confidence: 95 },
+      { source: 'Konferens', detail: 'Talare "Scaling Event-Driven Systems", Node Congress 2025', confidence: 88 },
+      { source: 'LinkedIn', detail: 'Senior Backend @ fintech-scaleup, 6 år erfarenhet', confidence: 82 },
+      { source: 'Stack Overflow', detail: '14k rykte, topp 3% inom [node.js] och [kafka]', confidence: 79 },
+    ],
+    years: 6, openToWork: 72,
+    tags: ['backend', 'typescript', 'node.js', 'kafka', 'aws', 'kubernetes', 'postgresql', 'stockholm', 'fintech', 'open source', 'distribuerade system'],
+  },
+  {
+    id: 's-yara', name: 'Yara El-Amin', title: 'Backend Developer', location: 'Göteborg',
+    summary: 'Backendutvecklare med djup databaskompetens från högvolyms-e-handel. Brinner för datamodellering och prestandaoptimering.',
+    skills: ['Node.js', 'TypeScript', 'PostgreSQL', 'Redis', 'GraphQL'],
+    growthSignals: ['Skrev bloggserie om SQL-optimering (30k läsningar)', 'Bytte från Java till Node på eget initiativ'],
+    fragments: [
+      { source: 'Blogg', detail: 'Teknisk blogg om databasindexering, 30k läsningar/år', confidence: 84 },
+      { source: 'GitHub', detail: '23 repos, bidrag till Prisma ORM', confidence: 80 },
+      { source: 'LinkedIn', detail: 'Backend @ e-handelsbolag, 5 år', confidence: 76 },
+    ],
+    years: 5, openToWork: 65,
+    tags: ['backend', 'node.js', 'typescript', 'postgresql', 'sql', 'graphql', 'göteborg', 'e-handel', 'databas'],
+  },
+  {
+    id: 's-elias', name: 'Elias Berg', title: 'Fullstack Engineer', location: 'Remote (Malmö)',
+    summary: 'Fullstackutvecklare från startup-miljö, van att bygga från noll. Stark på både React och Node, gillar produktnära arbete.',
+    skills: ['TypeScript', 'React', 'Node.js', 'tRPC', 'Postgres'],
+    growthSignals: ['Grundade ett indie-SaaS med 400 betalande kunder', 'Aktiv i svenska React-communityn'],
+    fragments: [
+      { source: 'GitHub', detail: '41 repos, egen SaaS-boilerplate med 600 stjärnor', confidence: 90 },
+      { source: 'Portfölj', detail: 'Personlig sajt med 6 lanserade sidoprojekt', confidence: 85 },
+      { source: 'Meetup', detail: 'Regelbunden deltagare React Meetup Malmö', confidence: 62 },
+    ],
+    years: 4, openToWork: 80,
+    tags: ['backend', 'frontend', 'fullstack', 'typescript', 'react', 'node.js', 'malmö', 'remote', 'startup', 'saas'],
+  },
+  {
+    id: 's-maja', name: 'Maja Fors', title: 'Product Designer', location: 'Stockholm',
+    summary: 'UX/Product-designer med starkt systemtänk. Har byggt designsystem från grunden och driver tillgänglighet som hjärtefråga.',
+    skills: ['Figma', 'Prototyping', 'Designsystem', 'Tillgänglighet', 'Användartester'],
+    growthSignals: ['Föreläser om a11y', 'Byggde designsystem som används av 40 utvecklare'],
+    fragments: [
+      { source: 'Dribbble', detail: '120 shots, fokus på datatunga gränssnitt', confidence: 86 },
+      { source: 'Portfölj', detail: 'Case-studies med mätbar UX-förbättring (+31% NPS)', confidence: 91 },
+      { source: 'Konferens', detail: 'Talare "Designsystem som skalar", UX Sthlm 2025', confidence: 78 },
+    ],
+    years: 7, openToWork: 58,
+    tags: ['design', 'ux', 'figma', 'prototyping', 'designsystem', 'tillgänglighet', 'stockholm', 'produktdesign'],
+  },
+  {
+    id: 's-omar', name: 'Omar Haddad', title: 'UX Engineer', location: 'Uppsala',
+    summary: 'Hybrid designer/utvecklare som bygger interaktiva prototyper i kod. Bro mellan design och engineering.',
+    skills: ['Figma', 'React', 'Framer', 'Prototyping', 'Motion'],
+    growthSignals: ['Bytte från frontend till UX engineering', 'Byggde open source-komponentbibliotek'],
+    fragments: [
+      { source: 'GitHub', detail: 'Komponentbibliotek med 900 stjärnor', confidence: 88 },
+      { source: 'Dribbble', detail: '45 shots med interaktiva prototyper', confidence: 74 },
+      { source: 'Blogg', detail: 'Skriver om design engineering', confidence: 70 },
+    ],
+    years: 5, openToWork: 69,
+    tags: ['design', 'ux', 'figma', 'react', 'prototyping', 'motion', 'uppsala', 'frontend'],
+  },
+  {
+    id: 's-sara', name: 'Sara Ekström', title: 'Data Engineer', location: 'Stockholm',
+    summary: 'Data engineer med bakgrund i ML-infrastruktur. Bygger datapipelines i Python och dbt, van vid stora datamängder.',
+    skills: ['Python', 'SQL', 'dbt', 'Airflow', 'Snowflake'],
+    growthSignals: ['Publicerade forskningsartikel om feature stores', 'Talare på PyData Stockholm'],
+    fragments: [
+      { source: 'Forskning', detail: 'Medförfattare, artikel om ML feature stores (94 citeringar)', confidence: 83 },
+      { source: 'GitHub', detail: '30 repos, bidrag till dbt-core', confidence: 81 },
+      { source: 'Konferens', detail: 'Talare PyData Stockholm 2024', confidence: 77 },
+    ],
+    years: 6, openToWork: 54,
+    tags: ['data', 'python', 'sql', 'dbt', 'airflow', 'snowflake', 'ml', 'stockholm', 'dataanalys'],
+  },
+  {
+    id: 's-johanna', name: 'Johanna Vik', title: 'Analytics Engineer', location: 'Remote (Umeå)',
+    summary: 'Analytics engineer som förvandlar rådata till beslutsunderlag. Stark på SQL, dbt och att kommunicera insikter till affären.',
+    skills: ['SQL', 'dbt', 'Python', 'Power BI', 'Looker'],
+    growthSignals: ['Omskolade sig från ekonom till data', 'Bygger publik dashboard-portfölj'],
+    fragments: [
+      { source: 'Portfölj', detail: 'Publika dashboards med öppna svenska data', confidence: 79 },
+      { source: 'GitHub', detail: '18 repos, dbt-modeller och SQL-övningar', confidence: 72 },
+      { source: 'LinkedIn', detail: 'Analytics Engineer @ SaaS-bolag, 4 år', confidence: 75 },
+    ],
+    years: 4, openToWork: 76,
+    tags: ['data', 'sql', 'dbt', 'python', 'power bi', 'looker', 'umeå', 'remote', 'analys', 'ekonomi'],
+  },
+  {
+    id: 's-david', name: 'David Núñez', title: 'Account Executive', location: 'Stockholm',
+    summary: 'B2B-säljare med track record inom SaaS. Bygger relationer och stänger stora affärer, van vid komplexa säljcykler.',
+    skills: ['B2B-försäljning', 'SaaS', 'CRM', 'Förhandling', 'Pipeline-hantering'],
+    growthSignals: ['120% av kvot tre år i rad', 'Byggde upp en ny marknad från noll'],
+    fragments: [
+      { source: 'LinkedIn', detail: 'Account Executive @ B2B SaaS, 6 år, topp-säljare', confidence: 85 },
+      { source: 'Blogg', detail: 'Skriver om moderna säljtekniker', confidence: 66 },
+    ],
+    years: 6, openToWork: 61,
+    tags: ['sälj', 'b2b', 'saas', 'crm', 'account manager', 'account executive', 'stockholm', 'förhandling'],
+  },
+  {
+    id: 's-linnea', name: 'Linnéa Holm', title: 'Customer Success Lead', location: 'Göteborg',
+    summary: 'Kundtjänst- och CX-ledare som höjt CSAT och byggt coachande team. Datadriven och van vid Zendesk och NPS-arbete.',
+    skills: ['Ledarskap', 'CX', 'Zendesk', 'NPS', 'Coaching'],
+    growthSignals: ['Höjde CSAT från 3.8 till 4.6', 'Byggde ett team om 12 från 3'],
+    fragments: [
+      { source: 'LinkedIn', detail: 'Customer Success Lead, 7 år, team om 12', confidence: 84 },
+      { source: 'Konferens', detail: 'Panelist om kundupplevelse, CX Forum 2025', confidence: 71 },
+    ],
+    years: 7, openToWork: 49,
+    tags: ['kundtjänst', 'cx', 'ledarskap', 'zendesk', 'nps', 'coaching', 'göteborg', 'customer success'],
+  },
+  {
+    id: 's-viktor', name: 'Viktor Ahl', title: 'Junior Backend Developer', location: 'Linköping',
+    summary: 'Nyexaminerad civilingenjör med stark portfölj av egna Node.js-projekt. Hungrig och snabblärd, söker första fasta rollen.',
+    skills: ['TypeScript', 'Node.js', 'Express', 'MongoDB'],
+    growthSignals: ['Byggde 8 sidoprojekt under studietiden', 'Vann ett hackathon 2025'],
+    fragments: [
+      { source: 'GitHub', detail: '34 repos, aktiv commit-historik under 2 år', confidence: 82 },
+      { source: 'Portfölj', detail: 'Studentportfölj med 8 projekt', confidence: 73 },
+    ],
+    years: 1, openToWork: 88,
+    tags: ['backend', 'typescript', 'node.js', 'express', 'mongodb', 'linköping', 'junior', 'nyexad'],
+  },
+]
 
 // ---------- Hjälpare ----------
 
@@ -927,7 +1060,8 @@ export const PIPE_NODE: PipelineNode = {
 // ---------- "Data som skapas här" per skärm ----------
 
 export const DATA_BADGES: { prefix: string; skapas: string[] }[] = [
-  { prefix: '/planering', skapas: ['headcount-mål per avdelning & roll', 'löne- & rekryteringsbudget', 'delegering till rekryterare', 'what-if-scenarier', 'CSV-import (bort från Excel)'] },
+  { prefix: '/planering', skapas: ['headcount-mål per avdelning & roll', 'löne- & rekryteringsbudget', 'delegering till rekryterare', 'what-if-scenarier', 'Excel/CSV-import (bort från Excel)'] },
+  { prefix: '/sourcing', skapas: ['sammanslagna webbprofiler (GitHub/portfölj/forskning)', 'confidence per fält', 'matchpoäng mot kravprofil', 'källa: AI-sourcing vid sparning'] },
   { prefix: '/ledningsfragor', skapas: ['inga — board-ready svar konsumeras ur pipelinen'] },
   { prefix: '/roller', skapas: ['kravprofil (must-have, meriterande)', 'succékriterier', 'lönespann & startdatum', 'intervjuplan & scorecard-mallar', 'kanalkostnader'] },
   { prefix: '/kandidater', skapas: ['stegförflyttning', 'tidsstämpel & aktör', 'avslagsorsak (obligatorisk)', 'källkanal', 'GDPR-samtycke'] },

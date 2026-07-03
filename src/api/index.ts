@@ -29,6 +29,9 @@ export const api = {
   postings: {
     create: (input: NewRoleInput) => call(() => server.addRole(input)),
   },
+  sourcing: {
+    saveToPipeline: (profileId: string, roleId: string) => call(() => server.saveSourcedToPipeline(profileId, roleId)),
+  },
   users: {
     updateProfile: (p: Profile) => call(() => server.updateProfile(p)),
     addMember: (m: TeamMember) => call(() => server.addMember(m)),

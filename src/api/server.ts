@@ -3,8 +3,9 @@
 // bytas mot riktiga API:er (SmartRecruiters/Teamtailor-form) utan UI-ändringar.
 
 import {
-  CANDIDATES, FEEDBACK_REQUESTS, OFFERS, PLAN_ROWS_2026, ROLES, USERS, stageLabel,
+  CANDIDATES, FEEDBACK_REQUESTS, OFFERS, PLAN_ROWS_2026, ROLES, SOURCED_POOL, USERS, roleTitle, stageLabel,
 } from '../data'
+import { matchProfile } from '../sourcing'
 import type {
   AppSettings, AuditEvent, Candidate, FeedbackRequest, Offer, PlanRow, Profile, Role,
   Scenario, Scorecard, ScorecardCriterion, StageId, TeamMember, User, WarningAck, WorkforcePlan,
@@ -32,6 +33,7 @@ interface DB {
   plan: WorkforcePlan
   scenarios: Scenario[]
   warningAcks: WarningAck[]
+  savedSourced: string[]
   audit: AuditEvent[]
   auditSeq: number
   settings: AppSettings
@@ -48,6 +50,7 @@ export interface Snapshot {
   plan: WorkforcePlan
   scenarios: Scenario[]
   warningAcks: WarningAck[]
+  savedSourced: string[]
   audit: AuditEvent[]
   settings: AppSettings
 }
@@ -76,6 +79,7 @@ export const db: DB = {
   plan: { id: 'plan-2026', namn: 'Årsplan 2026', ar: 2026, rows: PLAN_ROWS_2026 },
   scenarios: [],
   warningAcks: [],
+  savedSourced: [],
   audit: [],
   auditSeq: 0,
   settings: { apiFel: false },
@@ -99,6 +103,7 @@ export function snapshot(): Snapshot {
     plan: { ...db.plan, rows: [...db.plan.rows] },
     scenarios: [...db.scenarios],
     warningAcks: [...db.warningAcks],
+    savedSourced: [...db.savedSourced],
     audit: [...db.audit],
     settings: { ...db.settings },
   }
@@ -273,6 +278,41 @@ export function addRole(input: NewRoleInput): string {
   }
   logAudit('Roll skapad', `${input.titel} (chef: ${input.chef})`)
   return id
+}
+
+// ---------- AI-sourcing ----------
+
+export function saveSourcedToPipeline(profileId: string, roleId: string): string | null {
+  const p = SOURCED_POOL.find(x => x.id === profileId)
+  const role = db.roles.find(r => r.id === roleId)
+  if (!p || !role) return null
+  if (db.candidates.some(c => c.id === `src-${p.id}`)) return `src-${p.id}`
+
+  const ts = nowTs()
+  const match = matchProfile(p, role)
+  const cand: Candidate = {
+    id: `src-${p.id}`,
+    name: p.name,
+    roleId,
+    source: 'AI-sourcing',
+    appliedDate: ts.slice(0, 10),
+    stage: 'nya',
+    daysInStage: 0,
+    score: Math.round((match.score / 20) * 10) / 10, // 0–99 → ~0–5
+    cvSummary: p.summary,
+    email: `${p.name.toLowerCase().replace(/[^a-zåäö]/g, '.').replace(/\.+/g, '.')}@sourcad.demo`,
+    phone: '—',
+    gdprConsentUntil: '2027-12-31',
+    timeline: [
+      { ts, actor: 'AI-sourcing', text: `Profil funnen över webben (${p.fragments.map(f => f.source).join(', ')}) och sammanslagen automatiskt` },
+      { ts, actor: actor(), text: `Sparad till ${roleTitle(roleId)} — matchpoäng ${match.score}% mot kravprofilen` },
+    ],
+    scorecards: [],
+  }
+  db.candidates = [...db.candidates, cand]
+  db.savedSourced = [...db.savedSourced, p.id]
+  logAudit('AI-sourcing', `${p.name} sparad till ${roleTitle(roleId)} (match ${match.score}%)`)
+  return cand.id
 }
 
 // ---------- Användare & team ----------
