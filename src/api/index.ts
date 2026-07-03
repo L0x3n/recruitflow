@@ -32,6 +32,17 @@ export const api = {
   sourcing: {
     saveToPipeline: (profileId: string, roleId: string) => call(() => server.saveSourcedToPipeline(profileId, roleId)),
   },
+  outreach: {
+    send: (threadId: string, text: string) => call(() => server.sendMessage(threadId, text)),
+    advance: (threadId: string) => call(() => server.advanceSequence(threadId)),
+    enroll: (opts: { candidateId?: string; sourcedId?: string; roleId: string; sequenceId: string }) => call(() => server.enrollSequence(opts)),
+    moveFromThread: (threadId: string, stage: StageId) => call(() => server.moveFromThread(threadId, stage)),
+  },
+  headhunt: {
+    createLink: (roleId: string) => call(() => server.createHeadhuntLink(roleId)),
+    registerClick: (linkId: string) => call(() => server.registerHeadhuntClick(linkId), { bypassFail: true }),
+    apply: (linkId: string, roleId: string, name: string, note: string) => call(() => server.applyViaHeadhunt(linkId, roleId, name, note)),
+  },
   users: {
     updateProfile: (p: Profile) => call(() => server.updateProfile(p)),
     addMember: (m: TeamMember) => call(() => server.addMember(m)),

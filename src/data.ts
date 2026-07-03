@@ -860,6 +860,88 @@ export const CANDIDATES: Candidate[] = [
   },
 ]
 
+// ---------- Headhunt-länkar (spårbar attribution) ----------
+
+export const HEADHUNT_LINKS: import('./types').HeadhuntLink[] = [
+  { id: 'eva-k7x2', recruiter: 'Eva Lindqvist', roleId: 'backend', created: '2026-06-10', clicks: 34 },
+  { id: 'eva-9m4p', recruiter: 'Eva Lindqvist', roleId: 'ekonomi', created: '2026-06-18', clicks: 12 },
+  { id: 'sofia-3t8q', recruiter: 'Sofia Renberg', roleId: 'kundtjanst', created: '2026-06-14', clicks: 21 },
+]
+
+// Kandidater som redan sökt via headhunt-länkar (seed så leaderboarden har data)
+const hhCandidate = (
+  id: string, name: string, roleId: string, linkId: string, appliedDate: string,
+  stage: StageId, cvSummary: string, score?: number,
+): Candidate => ({
+  id, name, roleId, source: 'Headhunt', appliedDate, stage, daysInStage: 4, score,
+  cvSummary, email: `${name.toLowerCase().replace(/[^a-zåäö]/g, '.')}@mail.se`, phone: '070-000 00 00',
+  gdprConsentUntil: '2027-06-30', headhuntLinkId: linkId,
+  timeline: [
+    { ts: `${appliedDate} 10:00`, actor: 'System', text: `Ansökan via headhunt-länk (${linkId})` },
+  ],
+  scorecards: [],
+})
+
+export const HEADHUNT_CANDIDATES: Candidate[] = [
+  hhCandidate('hh-1', 'Rasmus Holt', 'backend', 'eva-k7x2', '2026-06-24', 'intervju',
+    'Backendutvecklare med 5 års erfarenhet, kontaktad direkt av rekryterare via headhunt-länk. Stark Node.js-profil.', 4.1),
+  hhCandidate('hh-2', 'Petra Lund', 'backend', 'eva-k7x2', '2026-06-28', 'screening',
+    'Systemutvecklare som klickade på en headhunt-länk från en konferens. Bred fullstack-bakgrund.'),
+  hhCandidate('hh-3', 'Ali Reza', 'kundtjanst', 'sofia-3t8q', '2026-06-26', 'screening',
+    'Kundtjänstprofil som sökte via Sofias headhunt-länk på LinkedIn.'),
+]
+
+// ---------- Outreach: sekvensmallar ----------
+
+export const SEQUENCES: import('./types').SequenceTemplate[] = [
+  {
+    id: 'seq-passiv', namn: 'Passiv kandidat (3 steg)',
+    steps: [
+      { dag: 0, kanal: 'linkedin', amne: 'Snabb fråga, {namn}', mall: 'Hej {namn}! Jag såg din bakgrund inom {skill} och vi söker en {roll}. Din profil sticker ut — vore det okej att jag berättade mer? / Eva' },
+      { dag: 3, kanal: 'mail', amne: 'Följer upp — {roll}', mall: 'Hej {namn}, hör bara av mig igen. Rollen som {roll} skulle passa din {skill}-erfarenhet väl. Har du 15 min i veckan? / Eva' },
+      { dag: 7, kanal: 'mail', amne: 'Sista pling', mall: 'Hej {namn}! Jag släpper det här om jag inte hör av dig — men dörren står öppen för {roll} när du är redo. Ha det fint! / Eva' },
+    ],
+  },
+  {
+    id: 'seq-aktiv', namn: 'Aktiv sökande (2 steg)',
+    steps: [
+      { dag: 0, kanal: 'mail', amne: 'Tack för din ansökan, {namn}', mall: 'Hej {namn}! Tack för din ansökan till {roll}. Din {skill}-erfarenhet ser spännande ut. Kan vi ta ett kort samtal? / Eva' },
+      { dag: 2, kanal: 'sms', amne: 'Påminnelse', mall: 'Hej {namn}! Eva från rekryteringen — hör gärna av dig om {roll}-samtalet. /Eva' },
+    ],
+  },
+]
+
+// ---------- Outreach: seed-trådar (joint inbox) ----------
+
+export const OUTREACH_THREADS: import('./types').OutreachThread[] = [
+  {
+    id: 't-noa', candidateName: 'Amir Haddad', candidateId: 'c-amir', roleId: 'backend',
+    channel: 'linkedin', status: 'svarade', sequenceId: 'seq-passiv', sequenceStep: 1,
+    lastActivity: '2026-07-02 16:20',
+    messages: [
+      { id: 'm1', from: 'rekryterare', author: 'Eva Lindqvist', ts: '2026-07-01 09:10', channel: 'linkedin', text: 'Hej Amir! Jag såg din bakgrund inom Kubernetes och drift och vi söker en Backend-utvecklare. Din profil sticker ut — vore det okej att jag berättade mer? / Eva', opened: true },
+      { id: 'm2', from: 'kandidat', author: 'Amir Haddad', ts: '2026-07-02 16:20', channel: 'linkedin', text: 'Hej Eva! Tack, låter intressant. Jag är öppen för att höra mer — särskilt om teamet och tech-stacken. När passar det dig?' },
+    ],
+  },
+  {
+    id: 't-viktor', candidateName: 'Viktor Öberg', candidateId: 'c-viktor', roleId: 'backend',
+    channel: 'mail', status: 'väntar', sequenceId: 'seq-aktiv', sequenceStep: 1,
+    lastActivity: '2026-07-02 10:00',
+    messages: [
+      { id: 'm1', from: 'rekryterare', author: 'Eva Lindqvist', ts: '2026-07-02 10:00', channel: 'mail', text: 'Hej Viktor! Tack för din ansökan till Backend-utvecklare. Din TypeScript-erfarenhet ser spännande ut. Kan vi ta ett kort samtal? / Eva', opened: true },
+    ],
+  },
+  {
+    id: 't-elin', candidateName: 'Elin Åkesson', candidateId: 'c-elin', roleId: 'ekonomi',
+    channel: 'mail', status: 'svarade', sequenceId: 'seq-aktiv', sequenceStep: 1,
+    lastActivity: '2026-06-30 14:05',
+    messages: [
+      { id: 'm1', from: 'rekryterare', author: 'Eva Lindqvist', ts: '2026-06-29 08:30', channel: 'mail', text: 'Hej Elin! Tack för din ansökan till Ekonomiassistent. Din Fortnox-erfarenhet ser spännande ut. Kan vi ta ett kort samtal? / Eva', opened: true },
+      { id: 'm2', from: 'kandidat', author: 'Elin Åkesson', ts: '2026-06-30 14:05', channel: 'mail', text: 'Hej Eva! Absolut, jag är väldigt intresserad. Jag kan när som helst på torsdag eller fredag. Ser fram emot att höra mer!' },
+    ],
+  },
+]
+
 // ---------- Feedback ----------
 
 export const FEEDBACK_REQUESTS: FeedbackRequest[] = [
@@ -1062,6 +1144,8 @@ export const PIPE_NODE: PipelineNode = {
 export const DATA_BADGES: { prefix: string; skapas: string[] }[] = [
   { prefix: '/planering', skapas: ['headcount-mål per avdelning & roll', 'löne- & rekryteringsbudget', 'delegering till rekryterare', 'what-if-scenarier', 'Excel/CSV-import (bort från Excel)'] },
   { prefix: '/sourcing', skapas: ['sammanslagna webbprofiler (GitHub/portfölj/forskning)', 'confidence per fält', 'matchpoäng mot kravprofil', 'källa: AI-sourcing vid sparning'] },
+  { prefix: '/inbox', skapas: ['outreach-meddelanden (mail/linkedin/sms)', 'sekvenssteg & svarstatus', 'trådkoppling kandidat+roll', 'stegförflyttning från tråd'] },
+  { prefix: '/headhunt', skapas: ['spårbara länkar per rekryterare×roll', 'klick & unika besök', 'attribuerade ansökningar', 'leaderboard-underlag'] },
   { prefix: '/ledningsfragor', skapas: ['inga — board-ready svar konsumeras ur pipelinen'] },
   { prefix: '/roller', skapas: ['kravprofil (must-have, meriterande)', 'succékriterier', 'lönespann & startdatum', 'intervjuplan & scorecard-mallar', 'kanalkostnader'] },
   { prefix: '/kandidater', skapas: ['stegförflyttning', 'tidsstämpel & aktör', 'avslagsorsak (obligatorisk)', 'källkanal', 'GDPR-samtycke'] },

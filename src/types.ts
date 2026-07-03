@@ -61,6 +61,15 @@ export interface Candidate {
   scorecards: Scorecard[]
   rejection?: { reason: string; note?: string }
   historical?: HistoricalOutcome
+  headhuntLinkId?: string // attribution om ansökan kom via en headhunt-länk
+}
+
+export interface HeadhuntLink {
+  id: string // t.ex. 'eva-k7x2'
+  recruiter: string
+  roleId: string
+  created: string
+  clicks: number
 }
 
 export interface AdChannel {
@@ -235,6 +244,47 @@ export interface MatchContribution {
 export interface MatchResult {
   score: number // 0–100
   contributions: MatchContribution[]
+}
+
+// ---------- Fas 4: Outreach + joint inbox ----------
+
+export type OutreachChannel = 'mail' | 'linkedin' | 'sms'
+
+export interface OutreachMessage {
+  id: string
+  from: 'rekryterare' | 'kandidat' | 'system'
+  author: string
+  ts: string
+  text: string
+  channel: OutreachChannel
+  opened?: boolean
+}
+
+export interface OutreachThread {
+  id: string
+  candidateName: string
+  candidateId?: string // om i pipeline
+  sourcedId?: string // om från sourcad pool
+  roleId: string
+  channel: OutreachChannel
+  status: 'sekvens' | 'väntar' | 'svarade'
+  sequenceId: string
+  sequenceStep: number // hur många steg som skickats
+  messages: OutreachMessage[]
+  lastActivity: string
+}
+
+export interface SequenceStep {
+  dag: number
+  kanal: OutreachChannel
+  amne: string
+  mall: string // {namn} {roll} {skill} ersätts
+}
+
+export interface SequenceTemplate {
+  id: string
+  namn: string
+  steps: SequenceStep[]
 }
 
 export interface Notification {

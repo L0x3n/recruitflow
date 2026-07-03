@@ -84,6 +84,8 @@ interface Store {
   scenarios: Snapshot['scenarios']
   warningAcks: Snapshot['warningAcks']
   savedSourced: Snapshot['savedSourced']
+  threads: Snapshot['threads']
+  headhuntLinks: Snapshot['headhuntLinks']
   audit: Snapshot['audit']
   settings: AppSettings
   // härlett
@@ -107,6 +109,13 @@ interface Store {
   remindOffer: (offerId: string) => void
   addRole: (input: NewRoleInput) => Promise<string | null>
   saveSourced: (profileId: string, roleId: string) => Promise<string | null>
+  sendMessage: (threadId: string, text: string) => void
+  advanceSequence: (threadId: string) => void
+  enrollSequence: (opts: { candidateId?: string; sourcedId?: string; roleId: string; sequenceId: string }) => Promise<string | null>
+  moveFromThread: (threadId: string, stage: StageId) => void
+  createHeadhuntLink: (roleId: string) => Promise<string | null>
+  registerHeadhuntClick: (linkId: string) => void
+  applyViaHeadhunt: (linkId: string, roleId: string, name: string, note: string) => Promise<string | null>
   updateProfile: (p: Profile) => void
   addMember: (m: TeamMember) => void
   // WFP
@@ -223,6 +232,29 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     run(() => api.sourcing.saveToPipeline(profileId, roleId), 'Profil sparad till pipelinen — källa: AI-sourcing'),
   [run])
 
+  const sendMessage = useCallback((threadId: string, text: string) => {
+    void run(() => api.outreach.send(threadId, text), 'Meddelande skickat')
+  }, [run])
+  const advanceSequence = useCallback((threadId: string) => {
+    void run(() => api.outreach.advance(threadId), 'Nästa sekvenssteg skickat')
+  }, [run])
+  const enrollSequence = useCallback(async (opts: { candidateId?: string; sourcedId?: string; roleId: string; sequenceId: string }) =>
+    run(() => api.outreach.enroll(opts), 'Outreach-sekvens startad'),
+  [run])
+  const moveFromThread = useCallback((threadId: string, stage: StageId) => {
+    void run(() => api.outreach.moveFromThread(threadId, stage), 'Kandidaten flyttad direkt från inkorgen')
+  }, [run])
+
+  const createHeadhuntLink = useCallback(async (roleId: string) =>
+    run(() => api.headhunt.createLink(roleId), 'Headhunt-länk skapad — sprid den och spåra vem du fångar'),
+  [run])
+  const registerHeadhuntClick = useCallback((linkId: string) => {
+    void api.headhunt.registerClick(linkId).then(() => setSnap(snapshot()))
+  }, [])
+  const applyViaHeadhunt = useCallback(async (linkId: string, roleId: string, name: string, note: string) =>
+    run(() => api.headhunt.apply(linkId, roleId, name, note)),
+  [run])
+
   const updateProfile = useCallback((p: Profile) => {
     void run(() => api.users.updateProfile(p), 'Profil uppdaterad')
   }, [run])
@@ -263,18 +295,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     candidates: snap.candidates, roles: snap.roles, feedback: snap.feedback, offers: snap.offers,
     team: snap.team, users: snap.users, currentUser: snap.currentUser,
     plan: snap.plan, scenarios: snap.scenarios, warningAcks: snap.warningAcks,
-    savedSourced: snap.savedSourced, audit: snap.audit, settings: snap.settings,
+    savedSourced: snap.savedSourced, threads: snap.threads, headhuntLinks: snap.headhuntLinks,
+    audit: snap.audit, settings: snap.settings,
     byId, roleTitleOf, profile, can, planStatuses, warnings,
     login, logout,
     moveCandidate, rejectTarget, requestReject, confirmReject, cancelReject,
-    answerFeedback, remindFeedback, remindOffer, addRole, saveSourced, updateProfile, addMember,
+    answerFeedback, remindFeedback, remindOffer, addRole, saveSourced,
+    sendMessage, advanceSequence, enrollSequence, moveFromThread,
+    createHeadhuntLink, registerHeadhuntClick, applyViaHeadhunt, updateProfile, addMember,
     updatePlanRow, addPlanRows, deletePlanRow, createScenario, updateScenarioRow, deleteScenario,
     ackWarning, setSetting,
     toasts, toast, tourStep, startTour, setTourStep,
   }), [
     snap, byId, roleTitleOf, profile, can, planStatuses, warnings, login, logout,
     moveCandidate, rejectTarget, requestReject, confirmReject, cancelReject,
-    answerFeedback, remindFeedback, remindOffer, addRole, saveSourced, updateProfile, addMember,
+    answerFeedback, remindFeedback, remindOffer, addRole, saveSourced,
+    sendMessage, advanceSequence, enrollSequence, moveFromThread,
+    createHeadhuntLink, registerHeadhuntClick, applyViaHeadhunt, updateProfile, addMember,
     updatePlanRow, addPlanRows, deletePlanRow, createScenario, updateScenarioRow, deleteScenario,
     ackWarning, setSetting, toasts, toast, tourStep, startTour,
   ])

@@ -4,6 +4,15 @@
 > som ersätter Excel — i en app, med rollstyrda inlogg och mockat API-lager.
 > Baserad på deep research 2026-07-03 (källor i §8).
 
+## STATUS
+- ✅ **Etapp 1 (Fas 0–2)** — API-lager + 3 rollinlogg/RBAC + Workforce Planning + varningar + Ledningsfrågor.
+- ✅ **Excel-import (.xlsx)** — SheetJS, arkväljare, datum, i Planering (utöver CSV).
+- ✅ **Etapp 2 (Fas 3–5)** — AI-sourcing (deep search → smart profiling → förklarbar match → pipeline),
+  outreach-sekvenser + joint inbox + Rita-assistent, headhunt-länkar med attribution + leaderboard +
+  publik jobbsida (/jobb?hh=).
+- ⏭️ **Kvar: Etapp 3 (Fas 6–7)** karriärsidebyggare/triggers/nurture + requisitions/offers/compliance,
+  **Etapp 4 (Fas 8–9)** rapportbyggare/copilot-Q&A + datapipeline v2/polish.
+
 ---
 
 ## 0. Vision — vad vi tar från vem
