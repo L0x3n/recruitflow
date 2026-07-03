@@ -132,6 +132,75 @@ export interface TeamMember {
   title: string
 }
 
+// ---------- Fas 0–2: användare, WFP, varningar, audit ----------
+
+export type RoleName = 'ledning' | 'chef' | 'rekryterare'
+
+export interface User extends Profile {
+  id: string
+  role: RoleName
+  roleLabel: string // "Ledningsgrupp" / "Rekryterande chef" / "Rekryterare"
+}
+
+export interface PlanRow {
+  id: string
+  avdelning: string
+  rollTitel: string
+  koppladRollId?: string // koppling till aktiv rekrytering
+  antal: number
+  kompetenser: string[]
+  lonebudget: number // kr/mån per person
+  rekrbudget: number // kr totalt för raden
+  malKvartal: string // 'Q3 2026'
+  malStart: string // ISO-datum
+  ansvarig: string // rekryterare (namn) — '' = ej delegerad
+  prioritet: 'hög' | 'normal'
+}
+
+export interface WorkforcePlan {
+  id: string
+  namn: string
+  ar: number
+  rows: PlanRow[]
+}
+
+export interface Scenario {
+  id: string
+  namn: string
+  skapad: string
+  rows: PlanRow[]
+}
+
+export type WarningRule = 'tackning' | 'inaktivitet' | 'prognos' | 'budget' | 'ejstartad'
+
+export interface PlanWarning {
+  id: string // stabil: `${rule}-${rowId}`
+  rule: WarningRule
+  severity: 'hög' | 'medel'
+  text: string
+  rowId: string
+  ansvarig: string
+}
+
+export interface WarningAck {
+  id: string // varnings-id
+  by: string
+  ts: string
+  comment?: string
+}
+
+export interface AuditEvent {
+  id: number
+  ts: string
+  actor: string
+  action: string
+  details: string
+}
+
+export interface AppSettings {
+  apiFel: boolean
+}
+
 export interface Notification {
   id: string
   text: string

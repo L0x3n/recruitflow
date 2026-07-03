@@ -1,6 +1,65 @@
 import type {
-  Candidate, FeedbackRequest, Notification, Offer, Role, Scorecard, StageId, TimelineEvent,
+  Candidate, FeedbackRequest, Notification, Offer, PlanRow, Role, Scorecard, StageId, TimelineEvent, User,
 } from './types'
+
+// ---------- Användare (mock-inlogg) ----------
+
+export const USERS: User[] = [
+  {
+    id: 'u-viktoria', name: 'Viktoria Ceder', title: 'Vd', role: 'ledning', roleLabel: 'Ledningsgrupp',
+    email: 'viktoria.ceder@bolaget.se', notiser: 'Veckosummering',
+  },
+  {
+    id: 'u-marcus', name: 'Marcus Öhrn', title: 'Utvecklingschef · rekryterande chef', role: 'chef', roleLabel: 'Rekryterande chef',
+    email: 'marcus.ohrn@bolaget.se', notiser: 'Direkt vid varningar och feedback',
+  },
+  {
+    id: 'u-eva', name: 'Eva Lindqvist', title: 'Rekryterare', role: 'rekryterare', roleLabel: 'Rekryterare',
+    email: 'eva.lindqvist@bolaget.se', notiser: 'Direkt vid chefsfeedback · dagligen för övrigt',
+  },
+]
+
+export const RECRUITERS = ['Eva Lindqvist', 'Sofia Renberg']
+
+// ---------- Workforce plan 2026 (seed) ----------
+
+export const PLAN_ROWS_2026: PlanRow[] = [
+  {
+    id: 'p-backend', avdelning: 'Utveckling', rollTitel: 'Backend-utvecklare', koppladRollId: 'backend',
+    antal: 3, kompetenser: ['TypeScript', 'Node.js', 'SQL'], lonebudget: 62000, rekrbudget: 60000,
+    malKvartal: 'Q3 2026', malStart: '2026-09-01', ansvarig: 'Eva Lindqvist', prioritet: 'hög',
+  },
+  {
+    id: 'p-ekonomi', avdelning: 'Ekonomi', rollTitel: 'Ekonomiassistent', koppladRollId: 'ekonomi',
+    antal: 2, kompetenser: ['Fortnox', 'Excel'], lonebudget: 38000, rekrbudget: 20000,
+    malKvartal: 'Q3 2026', malStart: '2026-08-15', ansvarig: 'Eva Lindqvist', prioritet: 'normal',
+  },
+  {
+    id: 'p-ktchef', avdelning: 'Kundtjänst', rollTitel: 'Kundtjänstchef', koppladRollId: 'kundtjanst',
+    antal: 1, kompetenser: ['Ledarskap', 'CX'], lonebudget: 56000, rekrbudget: 35000,
+    malKvartal: 'Q4 2026', malStart: '2026-10-01', ansvarig: 'Eva Lindqvist', prioritet: 'hög',
+  },
+  {
+    id: 'p-ktmed', avdelning: 'Kundtjänst', rollTitel: 'Kundtjänstmedarbetare',
+    antal: 2, kompetenser: ['Zendesk', 'Kundfokus'], lonebudget: 32000, rekrbudget: 15000,
+    malKvartal: 'Q3 2026', malStart: '2026-08-15', ansvarig: 'Sofia Renberg', prioritet: 'normal',
+  },
+  {
+    id: 'p-frontend', avdelning: 'Utveckling', rollTitel: 'Frontend-utvecklare',
+    antal: 1, kompetenser: ['React', 'TypeScript'], lonebudget: 58000, rekrbudget: 45000,
+    malKvartal: 'Q4 2026', malStart: '2026-11-01', ansvarig: 'Eva Lindqvist', prioritet: 'normal',
+  },
+  {
+    id: 'p-ux', avdelning: 'Design', rollTitel: 'UX-designer',
+    antal: 1, kompetenser: ['Figma', 'Prototyping'], lonebudget: 52000, rekrbudget: 40000,
+    malKvartal: 'Q4 2026', malStart: '2026-11-15', ansvarig: 'Sofia Renberg', prioritet: 'normal',
+  },
+  {
+    id: 'p-saljare', avdelning: 'Sälj', rollTitel: 'Account Manager',
+    antal: 2, kompetenser: ['B2B-försäljning', 'CRM'], lonebudget: 45000, rekrbudget: 50000,
+    malKvartal: 'Q1 2027', malStart: '2027-01-15', ansvarig: '', prioritet: 'normal',
+  },
+]
 
 // ---------- Steg ----------
 
@@ -868,6 +927,8 @@ export const PIPE_NODE: PipelineNode = {
 // ---------- "Data som skapas här" per skärm ----------
 
 export const DATA_BADGES: { prefix: string; skapas: string[] }[] = [
+  { prefix: '/planering', skapas: ['headcount-mål per avdelning & roll', 'löne- & rekryteringsbudget', 'delegering till rekryterare', 'what-if-scenarier', 'CSV-import (bort från Excel)'] },
+  { prefix: '/ledningsfragor', skapas: ['inga — board-ready svar konsumeras ur pipelinen'] },
   { prefix: '/roller', skapas: ['kravprofil (must-have, meriterande)', 'succékriterier', 'lönespann & startdatum', 'intervjuplan & scorecard-mallar', 'kanalkostnader'] },
   { prefix: '/kandidater', skapas: ['stegförflyttning', 'tidsstämpel & aktör', 'avslagsorsak (obligatorisk)', 'källkanal', 'GDPR-samtycke'] },
   { prefix: '/feedback', skapas: ['scorecard', 'intervjuanteckning', 'bedömare', 'tidsstämpel', 'svarstid'] },

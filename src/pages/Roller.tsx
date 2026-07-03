@@ -176,9 +176,9 @@ function NewRoleModal({ onClose }: { onClose: () => void }) {
   const valid = titel.trim().length > 1 && chef.trim().length > 1
   const splitList = (s: string) => s.split(/[,\n]/).map(x => x.trim()).filter(Boolean)
 
-  const create = () => {
+  const create = async () => {
     if (!valid) return
-    const id = addRole({
+    const id = await addRole({
       titel: titel.trim(),
       chef: chef.trim(),
       chefTitel: chefTitel.trim(),
@@ -189,7 +189,7 @@ function NewRoleModal({ onClose }: { onClose: () => void }) {
       succekriterier: krit.split('\n').map(x => x.trim()).filter(Boolean),
     })
     onClose()
-    navigate(`/roller/${id}`)
+    if (id) navigate(`/roller/${id}`)
   }
 
   return (
@@ -242,7 +242,7 @@ export function Roller() {
   const { roleId } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
-  const { candidates, roles } = useStore()
+  const { candidates, roles, can } = useStore()
   const [showNewRole, setShowNewRole] = useState(false)
   const tab = searchParams.get('tab') ?? 'kravprofil'
 
@@ -264,7 +264,7 @@ export function Roller() {
             <h1>Roller</h1>
             <div className="sub">Varje roll börjar med en strukturerad kravprofil — måttstocken för hela processen.</div>
           </div>
-          <button className="btn" onClick={() => setShowNewRole(true)}>+ Ny roll</button>
+          {can('operate') && <button className="btn" onClick={() => setShowNewRole(true)}>+ Ny roll</button>}
         </div>
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
           {roles.map(r => (

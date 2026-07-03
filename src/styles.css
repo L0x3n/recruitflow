@@ -430,7 +430,75 @@ table.tbl td.num, table.tbl th.num { text-align: right; font-variant-numeric: ta
 .radar-legend { display: flex; gap: 16px; font-size: 12.5px; justify-content: center; margin-top: 8px; }
 .radar-legend .rl-dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; }
 
+/* ---------- Inlogg ---------- */
+.login-page {
+  min-height: 100vh; display: grid; place-items: center; padding: 24px;
+  background: radial-gradient(1000px 600px at 20% 0%, #1E5240, var(--green-darker));
+}
+.login-card {
+  width: 460px; max-width: 94vw; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 20px; padding: 28px; color: #D8E6DF; backdrop-filter: blur(6px);
+}
+.login-card .logo { display: flex; align-items: center; gap: 10px; }
+.login-card .logo-mark {
+  width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, #2E7A5D, #1F5C46);
+  display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+.login-card .logo-name { font-weight: 700; font-size: 16px; }
+.login-card .logo-sub { font-size: 11px; color: #8FAEA1; }
+.login-sub { text-align: center; font-size: 13px; color: #9FBDB0; margin: 4px 0 18px; }
+.login-accounts { display: flex; flex-direction: column; gap: 10px; }
+.login-account {
+  display: flex; align-items: center; gap: 12px; text-align: left; padding: 13px 15px; border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); color: #EAF4EF;
+  transition: transform 0.12s ease, background 0.12s ease;
+}
+.login-account:hover { background: rgba(255, 255, 255, 0.13); transform: translateY(-1px); }
+.login-ico { font-size: 20px; }
+.login-avatar {
+  width: 38px; height: 38px; border-radius: 50%; background: rgba(127, 212, 175, 0.2); color: #7FD4AF;
+  display: grid; place-items: center; font-weight: 700; font-size: 13px; flex-shrink: 0;
+}
+.login-account b { display: block; font-size: 14px; }
+.login-rolelabel { display: block; font-size: 11px; color: #7FD4AF; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+.login-desc { display: block; font-size: 11.5px; color: #9FBDB0; margin-top: 2px; }
+.login-arrow { color: #7FD4AF; font-size: 16px; }
+.login-foot { text-align: center; font-size: 11px; color: #7E9B8E; margin-top: 16px; }
+
+/* ---------- Varningar & plan ---------- */
+.nav-badge {
+  margin-left: auto; background: var(--warn); color: #fff; border-radius: 999px;
+  padding: 0 7px; font-size: 10.5px; font-weight: 800; line-height: 17px;
+}
+.chip.danger { background: #FEE2E2; color: var(--red); }
+.warning-item {
+  display: flex; gap: 12px; align-items: center; border: 1px solid var(--border); border-left: 4px solid var(--warn);
+  border-radius: 11px; padding: 10px 13px; background: #fff;
+}
+.warning-item.sev-hög { border-left-color: var(--red); background: #FFFAFA; }
+.warning-item.acked { border-left-color: var(--green-mid); opacity: 0.75; }
+.warning-item .warning-text { font-size: 13px; }
+.progress { height: 9px; background: #E8EEEB; border-radius: 999px; overflow: hidden; margin: 8px 0 5px; }
+.progress > div { height: 100%; background: linear-gradient(90deg, var(--green-mid), var(--green)); border-radius: 999px; }
+.progress.big { height: 14px; margin-top: 10px; }
+.goal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.goal-card { border: 1px solid var(--border); border-radius: 12px; padding: 13px 15px; }
+.over-budget { color: var(--red); font-weight: 700; }
+.num-input { width: 64px; text-align: right; padding: 4px 7px; }
+.num-input.wide { width: 108px; }
+.mini-select { font-size: 11.5px; padding: 3px 6px; width: auto; max-width: 190px; }
+.plan-tbl td { vertical-align: top; }
+.scenario-diff { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; font-size: 13px; }
+
+/* ---------- Ledningsfrågor ---------- */
+.lf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.lf-card .lf-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+.lf-card .lf-head h2 { font-size: 15px; }
+.lf-verdict { margin-bottom: 6px; }
+
 @media (max-width: 1100px) {
+  .lf-grid { grid-template-columns: 1fr; }
   .kpi-grid { grid-template-columns: repeat(3, 1fr); }
   .fb-strip { grid-template-columns: 1fr; }
 }

@@ -46,12 +46,12 @@ function ScorePill({ score }: { score?: number }) {
   return <span className={`score-pill${score < 4 ? ' low' : ''}`}>★ {score.toFixed(1).replace('.', ',')}</span>
 }
 
-function KanbanCard({ c, onOpen }: { c: Candidate; onOpen: () => void }) {
+function KanbanCard({ c, onOpen, draggable }: { c: Candidate; onOpen: () => void; draggable: boolean }) {
   const [dragging, setDragging] = useState(false)
   return (
     <div
       className={`kcard${dragging ? ' dragging' : ''}`}
-      draggable
+      draggable={draggable}
       onDragStart={e => { e.dataTransfer.setData('text/candidate', c.id); setDragging(true) }}
       onDragEnd={() => setDragging(false)}
       onClick={onOpen}
@@ -69,7 +69,8 @@ function KanbanCard({ c, onOpen }: { c: Candidate; onOpen: () => void }) {
 }
 
 function Kanban({ roleId }: { roleId: string }) {
-  const { candidates, moveCandidate, requestReject } = useStore()
+  const { candidates, moveCandidate, requestReject, can } = useStore()
+  const canOperate = can('operate')
   const navigate = useNavigate()
   const [dropCol, setDropCol] = useState<StageId | null>(null)
   const [showAvslag, setShowAvslag] = useState(false)
@@ -86,6 +87,7 @@ function Kanban({ roleId }: { roleId: string }) {
   const onDrop = (stage: StageId) => (e: React.DragEvent) => {
     e.preventDefault()
     setDropCol(null)
+    if (!canOperate) return
     const id = e.dataTransfer.getData('text/candidate')
     if (!id) return
     if (stage === 'avslag') requestReject(id)
@@ -115,7 +117,7 @@ function Kanban({ roleId }: { roleId: string }) {
               {s.id === 'avslag' && <span className="muted">{showAvslag ? '‹' : '›'}</span>}
             </div>
             {!collapsed && cards.map(c => (
-              <KanbanCard key={c.id} c={c} onOpen={() => navigate(`/kandidater/${c.id}?roll=${roleId}`)} />
+              <KanbanCard key={c.id} c={c} draggable={canOperate} onOpen={() => navigate(`/kandidater/${c.id}?roll=${roleId}`)} />
             ))}
           </div>
         )

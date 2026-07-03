@@ -1,8 +1,11 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { CANDIDATES, FEEDBACK_REQUESTS, OFFERS, ROLES, stageLabel } from './data'
+import { api, snapshot, todayIso } from './api'
+import type { NewRoleInput, Snapshot } from './api'
+import { computePlan, evaluateWarnings } from './planning'
+import type { RowStatus } from './planning'
 import type {
-  Candidate, FeedbackRequest, Offer, Profile, Role, Scorecard, ScorecardCriterion, StageId, TeamMember,
+  AppSettings, PlanRow, PlanWarning, Profile, ScorecardCriterion, StageId, TeamMember, User,
 } from './types'
 
 export interface TourStep {
@@ -49,45 +52,71 @@ export const TOUR_STEPS: TourStep[] = [
   },
 ]
 
-interface Toast { id: number; text: string }
+// ---------- RBAC ----------
 
-export interface NewRoleInput {
-  titel: string
-  chef: string
-  chefTitel: string
-  lonespann: string
-  startdatum: string
-  mustHave: string[]
-  meriterande: string[]
-  succekriterier: string[]
+export type Permission =
+  | 'operate'        // flytta kandidater, svara feedback, skapa roller, outreach
+  | 'wfp.view'       // se hela planen
+  | 'wfp.viewOwn'    // se sina egna planrader
+  | 'wfp.edit'       // redigera budget/mål/delegering, importera, scenarier
+  | 'warnings.ack'   // kvittera varningar
+  | 'exec.view'      // ledningsstatistik
+  | 'audit.view'     // händelselogg
+
+const PERMS: Record<User['role'], Permission[]> = {
+  ledning: ['exec.view', 'wfp.view', 'audit.view'],
+  chef: ['exec.view', 'wfp.view', 'wfp.edit', 'warnings.ack', 'operate', 'audit.view'],
+  rekryterare: ['operate', 'wfp.viewOwn'],
 }
 
+interface Toast { id: number; text: string; error?: boolean }
+
 interface Store {
-  candidates: Candidate[]
-  byId: (id: string) => Candidate | undefined
+  // snapshot-data
+  candidates: Snapshot['candidates']
+  roles: Snapshot['roles']
+  feedback: Snapshot['feedback']
+  offers: Snapshot['offers']
+  team: TeamMember[]
+  users: User[]
+  currentUser: User | null
+  plan: Snapshot['plan']
+  scenarios: Snapshot['scenarios']
+  warningAcks: Snapshot['warningAcks']
+  audit: Snapshot['audit']
+  settings: AppSettings
+  // härlett
+  byId: (id: string) => Snapshot['candidates'][number] | undefined
+  roleTitleOf: (roleId: string) => string
+  profile: Profile
+  can: (p: Permission) => boolean
+  planStatuses: RowStatus[]
+  warnings: PlanWarning[]
+  // auth
+  login: (userId: string) => Promise<void>
+  logout: () => Promise<void>
+  // actions
   moveCandidate: (id: string, stage: StageId) => void
-  rejectTarget: string | null // candidate id eller 'demo'
+  rejectTarget: string | null
   requestReject: (id: string) => void
   confirmReject: (reason: string, note: string) => void
   cancelReject: () => void
-  roles: Role[]
-  addRole: (input: NewRoleInput) => string
-  roleTitleOf: (roleId: string) => string
-  feedback: FeedbackRequest[]
-  answerFeedback: (
-    requestId: string,
-    channel: 'röst' | 'foto' | 'text',
-    criteria: ScorecardCriterion[],
-    motivation: string,
-    voiceDuration?: string,
-  ) => void
+  answerFeedback: (requestId: string, channel: 'röst' | 'foto' | 'text', criteria: ScorecardCriterion[], motivation: string, voiceDuration?: string) => void
   remindFeedback: (requestId: string) => void
-  offers: Offer[]
   remindOffer: (offerId: string) => void
-  profile: Profile
+  addRole: (input: NewRoleInput) => Promise<string | null>
   updateProfile: (p: Profile) => void
-  team: TeamMember[]
   addMember: (m: TeamMember) => void
+  // WFP
+  updatePlanRow: (rowId: string, patch: Partial<PlanRow>) => void
+  addPlanRows: (rows: Omit<PlanRow, 'id'>[]) => Promise<number | null>
+  deletePlanRow: (rowId: string) => void
+  createScenario: (namn: string) => void
+  updateScenarioRow: (scenarioId: string, rowId: string, patch: Partial<PlanRow>) => void
+  deleteScenario: (scenarioId: string) => void
+  ackWarning: (warningId: string, comment: string) => void
+  setSetting: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void
+  // UI
   toasts: Toast[]
   toast: (text: string) => void
   tourStep: number | null
@@ -98,241 +127,150 @@ interface Store {
 const Ctx = createContext<Store>(null as unknown as Store)
 export const useStore = () => useContext(Ctx)
 
-const nowTs = () => {
-  const d = new Date()
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
-}
-
-const responseTimeFrom = (sentAt: string) => {
-  const t0 = new Date(sentAt.replace(' ', 'T')).getTime()
-  if (Number.isNaN(t0)) return '1 tim'
-  const h = Math.max(1, Math.round((Date.now() - t0) / 3_600_000))
-  return h < 48 ? `${h} tim` : `${Math.round(h / 24)} dagar`
-}
-
-const avgOf = (scorecards: Scorecard[]) => {
-  const all = scorecards.flatMap(s => s.criteria.map(c => c.score))
-  return all.length ? Math.round((all.reduce((a, b) => a + b, 0) / all.length) * 10) / 10 : undefined
-}
-
-const stageFromLabel = (label: string): StageId =>
-  /slutintervju/i.test(label) ? 'slutintervju'
-    : /case|teknisk|ledarcase|arbetsprov/i.test(label) ? 'case'
-    : 'intervju'
-
-const slugify = (s: string) =>
-  s.toLowerCase()
-    .replace(/[åä]/g, 'a').replace(/ö/g, 'o')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '')
-
-const INITIAL_PROFILE: Profile = {
-  name: 'Eva Lindqvist',
-  title: 'Rekryterare',
-  email: 'eva.lindqvist@bolaget.se',
-  notiser: 'Direkt vid chefsfeedback · dagligen för övrigt',
-}
-
-const INITIAL_TEAM: TeamMember[] = [
-  { name: 'Marcus Öhrn', title: 'Utvecklingschef · bedömare' },
-  { name: 'Karin Ahlgren', title: 'Ekonomichef · bedömare' },
-  { name: 'Peter Sandell', title: 'COO · bedömare' },
-  { name: 'Nadia Berg', title: 'Teamlead · bedömare' },
-]
-
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [candidates, setCandidates] = useState<Candidate[]>(CANDIDATES)
-  const [roles, setRoles] = useState<Role[]>(ROLES)
-  const [feedback, setFeedback] = useState<FeedbackRequest[]>(FEEDBACK_REQUESTS)
-  const [offers, setOffers] = useState<Offer[]>(OFFERS)
-  const [profile, setProfile] = useState<Profile>(INITIAL_PROFILE)
-  const [team, setTeam] = useState<TeamMember[]>(INITIAL_TEAM)
+  const [snap, setSnap] = useState<Snapshot>(() => snapshot())
   const [rejectTarget, setRejectTarget] = useState<string | null>(null)
   const [toasts, setToasts] = useState<Toast[]>([])
   const [tourStep, setTourStep] = useState<number | null>(null)
   const toastId = useRef(0)
 
-  const toast = useCallback((text: string) => {
+  const pushToast = useCallback((text: string, error = false) => {
     const id = ++toastId.current
-    setToasts(t => [...t, { id, text }])
-    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3500)
+    setToasts(t => [...t, { id, text, error }])
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), error ? 5000 : 3500)
   }, [])
 
-  const addTimelineEvent = useCallback((candidateId: string, actor: string, text: string) => {
-    setCandidates(cs => cs.map(c => c.id === candidateId
-      ? { ...c, timeline: [...c.timeline, { ts: nowTs(), actor, text }] }
-      : c))
-  }, [])
+  const toast = useCallback((text: string) => pushToast(text), [pushToast])
 
+  // Kör en API-mutation: latens → uppdatera snapshot → ev. success-toast; fel → fel-toast.
+  const run = useCallback(async <T,>(fn: () => Promise<T>, successToast?: string): Promise<T | null> => {
+    try {
+      const result = await fn()
+      setSnap(snapshot())
+      if (successToast) pushToast(successToast)
+      return result
+    } catch (e) {
+      setSnap(snapshot())
+      pushToast(`⚠ ${e instanceof Error ? e.message : 'Okänt fel'} — ändringen sparades inte`, true)
+      return null
+    }
+  }, [pushToast])
+
+  // ---- härlett ----
+  const byId = useCallback((id: string) => snap.candidates.find(c => c.id === id), [snap.candidates])
+  const roleTitleOf = useCallback(
+    (roleId: string) => snap.roles.find(r => r.id === roleId)?.titel ?? 'Tidigare rekrytering',
+    [snap.roles],
+  )
+  const can = useCallback(
+    (p: Permission) => !!snap.currentUser && PERMS[snap.currentUser.role].includes(p),
+    [snap.currentUser],
+  )
+  const profile: Profile = snap.currentUser ?? { name: '—', title: '', email: '', notiser: '' }
+
+  const planStatuses = useMemo(
+    () => computePlan(snap.plan.rows, snap.candidates, snap.roles, snap.offers, todayIso()),
+    [snap.plan.rows, snap.candidates, snap.roles, snap.offers],
+  )
+  const warnings = useMemo(
+    () => evaluateWarnings(planStatuses, snap.candidates, todayIso()),
+    [planStatuses, snap.candidates],
+  )
+
+  // ---- auth ----
+  const login = useCallback(async (userId: string) => { await run(() => api.auth.login(userId)) }, [run])
+  const logout = useCallback(async () => { setTourStep(null); await run(() => api.auth.logout()) }, [run])
+
+  // ---- actions ----
   const moveCandidate = useCallback((id: string, stage: StageId) => {
-    setCandidates(cs => cs.map(c => {
-      if (c.id !== id || c.stage === stage) return c
-      return {
-        ...c, stage, daysInStage: 0,
-        timeline: [...c.timeline, { ts: nowTs(), actor: profile.name, text: `Flyttade kandidat till ${stageLabel(stage)}` }],
-      }
-    }))
-  }, [profile.name])
+    void run(() => api.candidates.move(id, stage))
+  }, [run])
 
   const requestReject = useCallback((id: string) => setRejectTarget(id), [])
   const cancelReject = useCallback(() => setRejectTarget(null), [])
-
   const confirmReject = useCallback((reason: string, note: string) => {
     setRejectTarget(target => {
       if (target && target !== 'demo') {
-        setCandidates(cs => cs.map(c => c.id === target
-          ? {
-              ...c, stage: 'avslag' as StageId, daysInStage: 0,
-              rejection: { reason, note: note || undefined },
-              timeline: [...c.timeline, { ts: nowTs(), actor: profile.name, text: `Avslag registrerat med orsak: ${reason}` }],
-            }
-          : c))
-        toast('Avslag loggat med orsak — datan finns kvar i pipelinen')
+        void run(() => api.candidates.reject(target, reason, note), 'Avslag loggat med orsak — datan finns kvar i pipelinen')
       }
       return null
     })
-  }, [toast, profile.name])
+  }, [run])
 
-  const byId = useCallback((id: string) => candidates.find(c => c.id === id), [candidates])
-
-  const roleTitleOf = useCallback(
-    (roleId: string) => roles.find(r => r.id === roleId)?.titel ?? 'Tidigare rekrytering',
-    [roles],
-  )
-
-  const addRole = useCallback((input: NewRoleInput): string => {
-    let id = slugify(input.titel) || 'roll'
-    setRoles(rs => {
-      while (rs.some(r => r.id === id)) id = `${id}-2`
-      const role: Role = {
-        id,
-        titel: input.titel,
-        status: 'aktiv',
-        chef: input.chef,
-        chefTitel: input.chefTitel || 'Rekryterande chef',
-        mustHave: input.mustHave,
-        meriterande: input.meriterande,
-        lonespann: input.lonespann || 'ej satt',
-        startdatum: input.startdatum || 'ej satt',
-        succekriterier: input.succekriterier,
-        kravprofilKomplett: input.succekriterier.length > 0 && input.mustHave.length > 0,
-        kriterier: ['Fackkompetens', 'Erfarenhet', 'Samarbete & kommunikation', 'Problemlösning', 'Motivation & driv'],
-        annonsering: [
-          { kanal: 'LinkedIn', kostnad: 0, visningar: 0, ansokningar: 0 },
-          { kanal: 'Arbetsförmedlingen', kostnad: 0, visningar: 0, ansokningar: 0 },
-          { kanal: 'Karriärsida', kostnad: 0, visningar: 0, ansokningar: 0 },
-        ],
-        intervjuplan: [
-          { namn: 'CV-screening', langd: '—', bedomare: `${profile.name} (rekryterare)`, scorecard: `Screeningmall ${input.titel}` },
-          { namn: 'Telefonintervju', langd: '30 min', bedomare: `${profile.name} (rekryterare)`, scorecard: `Telefonintervju ${input.titel}` },
-          { namn: 'Case/Arbetsprov', langd: '60 min', bedomare: `${input.chef} (chef)`, scorecard: `Case ${input.titel}` },
-          { namn: 'Slutintervju', langd: '45 min', bedomare: `${input.chef} (chef) + HR`, scorecard: `Slutintervju ${input.titel}` },
-          { namn: 'Referenser', langd: '2 × 20 min', bedomare: `${profile.name} (rekryterare)`, scorecard: 'Referensmall' },
-          { namn: 'Erbjudande', langd: '—', bedomare: `${input.chef} (chef)`, scorecard: '—' },
-        ],
-      }
-      return [...rs, role]
-    })
-    setTeam(ts => ts.some(m => m.name === input.chef)
-      ? ts
-      : [...ts, { name: input.chef, title: `${input.chefTitel || 'Rekryterande chef'} · bedömare` }])
-    toast(`Rollen "${input.titel}" skapad — kravprofilen är måttstocken`)
-    return id
-  }, [profile.name, toast])
-
-  const answerFeedback = useCallback((
-    requestId: string,
-    channel: 'röst' | 'foto' | 'text',
-    criteria: ScorecardCriterion[],
-    motivation: string,
-    voiceDuration?: string,
-  ) => {
-    const req = feedback.find(f => f.id === requestId)
-    if (!req || req.status === 'besvarad') return
-    const ts = nowTs()
-
-    setFeedback(fs => fs.map(f => f.id === requestId
-      ? {
-          ...f, status: 'besvarad' as const, respondedAt: ts, channel,
-          responseTime: responseTimeFrom(f.sentAt),
-          voice: channel === 'röst' ? { duration: voiceDuration ?? '0:30', quote: motivation } : f.voice,
-        }
-      : f))
-
-    setCandidates(cs => cs.map(c => {
-      if (c.id !== req.candidateId) return c
-      const stage = stageFromLabel(req.stageLabel)
-      const card: Scorecard = {
-        stage,
-        stageLabel: req.stageLabel.replace(/^Nästa steg: /, ''),
-        assessor: req.till,
-        date: ts.slice(0, 10),
-        criteria,
-        motivation,
-        via: channel,
-      }
-      const scorecards = [...c.scorecards, card]
-      const cardAvg = criteria.reduce((a, b) => a + b.score, 0) / criteria.length
-      const viaLabel = channel === 'röst' ? 'röstmemo' : channel === 'foto' ? 'foto av anteckningar' : 'text'
-      return {
-        ...c,
-        scorecards,
-        score: avgOf(scorecards),
-        timeline: [...c.timeline, {
-          ts, actor: req.till,
-          text: `Lämnade scorecard via ${viaLabel} (${cardAvg.toFixed(1).replace('.', ',')}) — svarstid ${responseTimeFrom(req.sentAt)}`,
-        }],
-      }
-    }))
-
-    toast('Feedback sparad — strukturerad och kopplad till kandidat, roll och steg')
-  }, [feedback, toast])
+  const answerFeedback = useCallback((requestId: string, channel: 'röst' | 'foto' | 'text', criteria: ScorecardCriterion[], motivation: string, voiceDuration?: string) => {
+    void run(() => api.feedback.answer(requestId, channel, criteria, motivation, voiceDuration),
+      'Feedback sparad — strukturerad och kopplad till kandidat, roll och steg')
+  }, [run])
 
   const remindFeedback = useCallback((requestId: string) => {
-    const req = feedback.find(f => f.id === requestId)
-    if (!req) return
-    const ts = nowTs()
-    setFeedback(fs => fs.map(f => f.id === requestId ? { ...f, remindedAt: ts } : f))
-    addTimelineEvent(req.candidateId, profile.name, `Påminnelse om feedback skickad till ${req.till}`)
-    toast(`Påminnelse skickad till ${req.till}`)
-  }, [feedback, addTimelineEvent, profile.name, toast])
+    const req = snap.feedback.find(f => f.id === requestId)
+    void run(() => api.feedback.remind(requestId), `Påminnelse skickad till ${req?.till}`)
+  }, [run, snap.feedback])
 
   const remindOffer = useCallback((offerId: string) => {
-    const offer = offers.find(o => o.id === offerId)
-    if (!offer) return
-    const ts = nowTs()
-    setOffers(os => os.map(o => o.id === offerId ? { ...o, remindedAt: ts } : o))
-    const cand = candidates.find(c => c.id === offer.candidateId)
-    addTimelineEvent(offer.candidateId, profile.name, 'Påminnelse om erbjudandet skickad till kandidaten')
-    toast(`Påminnelse skickad till ${cand?.name ?? 'kandidaten'}`)
-  }, [offers, candidates, addTimelineEvent, profile.name, toast])
+    const offer = snap.offers.find(o => o.id === offerId)
+    const cand = offer && snap.candidates.find(c => c.id === offer.candidateId)
+    void run(() => api.offers.remind(offerId), `Påminnelse skickad till ${cand?.name ?? 'kandidaten'}`)
+  }, [run, snap.offers, snap.candidates])
+
+  const addRole = useCallback(async (input: NewRoleInput) =>
+    run(() => api.postings.create(input), `Rollen "${input.titel}" skapad — kravprofilen är måttstocken`),
+  [run])
 
   const updateProfile = useCallback((p: Profile) => {
-    setProfile(p)
-    toast('Profil uppdaterad')
-  }, [toast])
+    void run(() => api.users.updateProfile(p), 'Profil uppdaterad')
+  }, [run])
 
   const addMember = useCallback((m: TeamMember) => {
-    setTeam(ts => [...ts, m])
-    toast(`${m.name} tillagd i teamet`)
-  }, [toast])
+    void run(() => api.users.addMember(m), `${m.name} tillagd i teamet`)
+  }, [run])
+
+  // ---- WFP ----
+  const updatePlanRow = useCallback((rowId: string, patch: Partial<PlanRow>) => {
+    void run(() => api.wfp.updateRow(rowId, patch))
+  }, [run])
+  const addPlanRows = useCallback(async (rows: Omit<PlanRow, 'id'>[]) =>
+    run(() => api.wfp.addRows(rows), `${rows.length} planrader importerade — Excel-filen kan pensioneras`),
+  [run])
+  const deletePlanRow = useCallback((rowId: string) => {
+    void run(() => api.wfp.deleteRow(rowId), 'Planrad borttagen')
+  }, [run])
+  const createScenario = useCallback((namn: string) => {
+    void run(() => api.wfp.createScenario(namn), `Scenario "${namn}" skapat`)
+  }, [run])
+  const updateScenarioRow = useCallback((scenarioId: string, rowId: string, patch: Partial<PlanRow>) => {
+    void run(() => api.wfp.updateScenarioRow(scenarioId, rowId, patch))
+  }, [run])
+  const deleteScenario = useCallback((scenarioId: string) => {
+    void run(() => api.wfp.deleteScenario(scenarioId), 'Scenario raderat')
+  }, [run])
+  const ackWarning = useCallback((warningId: string, comment: string) => {
+    void run(() => api.wfp.ackWarning(warningId, comment), 'Varning kvitterad — loggad i händelseloggen')
+  }, [run])
+  const setSetting = useCallback(<K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
+    void run(() => api.settings.set(key, value))
+  }, [run])
 
   const startTour = useCallback(() => setTourStep(0), [])
 
   const value = useMemo<Store>(() => ({
-    candidates, byId, moveCandidate,
-    rejectTarget, requestReject, confirmReject, cancelReject,
-    roles, addRole, roleTitleOf,
-    feedback, answerFeedback, remindFeedback,
-    offers, remindOffer,
-    profile, updateProfile, team, addMember,
-    toasts, toast,
-    tourStep, startTour, setTourStep,
+    candidates: snap.candidates, roles: snap.roles, feedback: snap.feedback, offers: snap.offers,
+    team: snap.team, users: snap.users, currentUser: snap.currentUser,
+    plan: snap.plan, scenarios: snap.scenarios, warningAcks: snap.warningAcks,
+    audit: snap.audit, settings: snap.settings,
+    byId, roleTitleOf, profile, can, planStatuses, warnings,
+    login, logout,
+    moveCandidate, rejectTarget, requestReject, confirmReject, cancelReject,
+    answerFeedback, remindFeedback, remindOffer, addRole, updateProfile, addMember,
+    updatePlanRow, addPlanRows, deletePlanRow, createScenario, updateScenarioRow, deleteScenario,
+    ackWarning, setSetting,
+    toasts, toast, tourStep, startTour, setTourStep,
   }), [
-    candidates, byId, moveCandidate, rejectTarget, requestReject, confirmReject, cancelReject,
-    roles, addRole, roleTitleOf, feedback, answerFeedback, remindFeedback, offers, remindOffer,
-    profile, updateProfile, team, addMember, toasts, toast, tourStep, startTour,
+    snap, byId, roleTitleOf, profile, can, planStatuses, warnings, login, logout,
+    moveCandidate, rejectTarget, requestReject, confirmReject, cancelReject,
+    answerFeedback, remindFeedback, remindOffer, addRole, updateProfile, addMember,
+    updatePlanRow, addPlanRows, deletePlanRow, createScenario, updateScenarioRow, deleteScenario,
+    ackWarning, setSetting, toasts, toast, tourStep, startTour,
   ])
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

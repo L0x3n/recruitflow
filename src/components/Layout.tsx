@@ -5,13 +5,17 @@ import { useStore } from '../store'
 import { RejectModal } from './RejectModal'
 import { Tour } from './Tour'
 
-const NAV = [
+import type { Permission } from '../store'
+
+const NAV: { to: string; ico: string; label: string; needs?: Permission }[] = [
   { to: '/', ico: '◫', label: 'Översikt' },
+  { to: '/planering', ico: '▦', label: 'Planering' },
   { to: '/roller', ico: '▤', label: 'Roller' },
   { to: '/kandidater', ico: '⋮⋮', label: 'Kandidater' },
   { to: '/feedback', ico: '◉', label: 'Feedback' },
   { to: '/erbjudanden', ico: '✓', label: 'Erbjudanden' },
   { to: '/analys', ico: '∿', label: 'Analys' },
+  { to: '/ledningsfragor', ico: '❖', label: 'Ledningsfrågor', needs: 'exec.view' },
 ]
 
 function useClickOutside(onOutside: () => void) {
@@ -97,24 +101,24 @@ function Bell() {
 function AccountMenu() {
   const [open, setOpen] = useState(false)
   const navigate = useNavigate()
-  const { profile, startTour } = useStore()
+  const { profile, currentUser, startTour, logout } = useStore()
   const ref = useClickOutside(() => setOpen(false))
   const initials = profile.name.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()
 
   return (
     <div className="avatar-wrap" ref={ref}>
-      <button className="avatar-chip" onClick={() => setOpen(o => !o)}>
+      <button className="avatar-chip" onClick={() => setOpen(o => !o)} data-testid="account-menu">
         <div className="avatar">{initials}</div>
         <div style={{ textAlign: 'left' }}>
           <div className="avatar-name">{profile.name}</div>
-          <div className="avatar-role">{profile.title}</div>
+          <div className="avatar-role">{currentUser?.roleLabel ?? profile.title}</div>
         </div>
       </button>
       {open && (
         <div className="popover">
           <div className="pop-head">
             {profile.name}
-            <div className="pop-time">{profile.title} · {profile.email}</div>
+            <div className="pop-time">{currentUser?.roleLabel} · {profile.email}</div>
           </div>
           <button className="pop-item" onClick={() => { setOpen(false); navigate('/installningar?edit=profil') }}>
             ✎ Redigera profil
@@ -124,6 +128,9 @@ function AccountMenu() {
           </button>
           <button className="pop-item" onClick={() => { setOpen(false); startTour() }}>
             ✦ Starta guidad tur
+          </button>
+          <button className="pop-item" onClick={() => { setOpen(false); logout() }} data-testid="logout">
+            ⇄ Byt konto / logga ut
           </button>
         </div>
       )}
@@ -195,7 +202,9 @@ function Toasts() {
 }
 
 export function Layout() {
-  const { startTour } = useStore()
+  const { startTour, currentUser, can, warnings, warningAcks } = useStore()
+  const openWarnings = warnings.filter(w => !warningAcks.some(a => a.id === w.id)
+    && (can('warnings.ack') || can('exec.view') || w.ansvarig === currentUser?.name)).length
   return (
     <div className="app">
       <aside className="sidebar">
@@ -207,9 +216,10 @@ export function Layout() {
           </div>
         </div>
         <nav>
-          {NAV.map(n => (
+          {NAV.filter(n => !n.needs || can(n.needs)).map(n => (
             <NavLink key={n.to} to={n.to} end={n.to === '/'} className={({ isActive }) => isActive ? 'active' : ''}>
               <span className="ico">{n.ico}</span>{n.label}
+              {n.to === '/' && openWarnings > 0 && <span className="nav-badge">{openWarnings}</span>}
             </NavLink>
           ))}
           <NavLink to="/datapipeline" className={({ isActive }) => `pipeline-link${isActive ? ' active' : ''}`}>

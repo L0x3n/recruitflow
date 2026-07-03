@@ -134,6 +134,58 @@ const DATAMODELL = [
   },
 ]
 
+function DemoApiCard() {
+  const { settings, setSetting } = useStore()
+  return (
+    <div className="card">
+      <h2 style={{ marginBottom: 6 }}>Demo & API</h2>
+      <div className="muted small" style={{ marginBottom: 10 }}>
+        Appen pratar med ett mockat API-lager (format efter SmartRecruiters/Teamtailor) med simulerad latens.
+        Slå på felsimulering för att se hur appen hanterar ett API som ligger nere.
+      </div>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer' }}>
+        <input
+          type="checkbox"
+          checked={settings.apiFel}
+          onChange={e => setSetting('apiFel', e.target.checked)}
+          data-testid="api-fel-toggle"
+        />
+        <span>Simulera API-fel (alla ändringar svarar 503 tills du stänger av)</span>
+      </label>
+    </div>
+  )
+}
+
+function AuditCard() {
+  const { audit, can } = useStore()
+  if (!can('audit.view')) return null
+  const events = [...audit].reverse().slice(0, 30)
+  return (
+    <div className="card" data-testid="audit-log">
+      <h2 style={{ marginBottom: 6 }}>Händelselogg (audit)</h2>
+      <div className="muted small" style={{ marginBottom: 10 }}>
+        Append-only — varje mutation via API:t loggas med aktör och tidsstämpel. Grunden för compliance-centret.
+      </div>
+      {events.length === 0 && <div className="muted small">Inga händelser ännu i den här sessionen.</div>}
+      {events.length > 0 && (
+        <table className="tbl">
+          <thead><tr><th>Tid</th><th>Aktör</th><th>Händelse</th><th>Detaljer</th></tr></thead>
+          <tbody>
+            {events.map(e => (
+              <tr key={e.id}>
+                <td className="num" style={{ whiteSpace: 'nowrap' }}>{e.ts}</td>
+                <td>{e.actor}</td>
+                <td><b>{e.action}</b></td>
+                <td>{e.details}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  )
+}
+
 export function Installningar() {
   const location = useLocation()
   const dmRef = useRef<HTMLDivElement>(null)
@@ -160,6 +212,9 @@ export function Installningar() {
         <ProfileCard key={String(editProfile)} startInEdit={editProfile} />
         <TeamCard />
       </div>
+
+      <DemoApiCard />
+      <AuditCard />
 
       <div className="card" ref={dmRef} style={showDatamodell ? { borderColor: 'var(--green-mid)' } : undefined}>
         <h2 style={{ marginBottom: 4 }}>Datamodellen — röret i pipelinen</h2>
