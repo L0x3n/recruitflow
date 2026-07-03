@@ -1,8 +1,45 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ROLES, STAGES, roleTitle, stageLabel } from '../data'
+import { STAGES, stageLabel } from '../data'
 import { useStore } from '../store'
 import type { Candidate, StageId } from '../types'
+
+// Bygger ett riktigt nedladdningsbart HTML-dokument av kandidatens data.
+function downloadDocument(c: Candidate, roleLabel: string, kind: 'cv' | 'brev') {
+  const style = `
+    body { font-family: Georgia, serif; max-width: 640px; margin: 48px auto; color: #1A2B24; line-height: 1.6; }
+    h1 { font-size: 26px; margin-bottom: 2px; } h2 { font-size: 15px; color: #1F5C46; margin-top: 28px; }
+    .meta { color: #6B7A73; font-size: 13px; } hr { border: none; border-top: 1px solid #E3E9E6; margin: 18px 0; }
+  `
+  const body = kind === 'cv'
+    ? `<h1>${c.name}</h1>
+       <div class="meta">${c.email} · ${c.phone}</div>
+       <hr />
+       <h2>Profil</h2><p>${c.cvSummary}</p>
+       <h2>Söker rollen</h2><p>${roleLabel} — ansökan inskickad ${c.appliedDate} via ${c.source}.</p>
+       <h2>Bedömningar i processen</h2>
+       ${c.scorecards.length
+         ? c.scorecards.map(s => `<p><b>${s.stageLabel}</b> (${s.date}, ${s.assessor}): ${s.motivation}</p>`).join('')
+         : '<p>Inga bedömningar ännu.</p>'}
+       <hr /><div class="meta">Exporterad från RecruitFlow · GDPR-samtycke t.o.m. ${c.gdprConsentUntil}</div>`
+    : `<h1>Personligt brev</h1>
+       <div class="meta">${c.name} · ${c.appliedDate}</div>
+       <hr />
+       <p>Hej!</p>
+       <p>Jag söker tjänsten som ${roleLabel} hos er. ${c.cvSummary}</p>
+       <p>Det som lockar mig med just er är kombinationen av tydliga mål och ett strukturerat arbetssätt —
+       jag trivs som bäst när förväntningarna är klara och jag kan ta eget ansvar för leveransen.</p>
+       <p>Jag ser fram emot att berätta mer i en intervju.</p>
+       <p>Vänliga hälsningar,<br /><b>${c.name}</b><br />${c.email} · ${c.phone}</p>`
+  const html = `<!doctype html><html lang="sv"><head><meta charset="utf-8"><title>${kind === 'cv' ? 'CV' : 'Personligt brev'} — ${c.name}</title><style>${style}</style></head><body>${body}</body></html>`
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${kind === 'cv' ? 'CV' : 'Personligt_brev'}_${c.name.replace(/\s+/g, '_')}.html`
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
 function ScorePill({ score }: { score?: number }) {
   if (score === undefined) return null
@@ -156,9 +193,10 @@ function CandidateFeedback({ c }: { c: Candidate }) {
 function CandidateDrawer({ c }: { c: Candidate }) {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { demo } = useStore()
+  const { roleTitleOf, toast } = useStore()
   const tab = searchParams.get('tab') ?? 'oversikt'
   const back = () => navigate(`/kandidater${c.roleId !== 'historisk' ? `?roll=${c.roleId}` : ''}`)
+  const roleLabel = c.historical?.roleLabel ?? roleTitleOf(c.roleId)
 
   return (
     <>
@@ -169,7 +207,7 @@ function CandidateDrawer({ c }: { c: Candidate }) {
             <div>
               <h1>{c.name}</h1>
               <div className="sub" style={{ color: 'var(--muted)', fontSize: 13 }}>
-                {c.historical?.roleLabel ?? roleTitle(c.roleId)} · ansökte {c.appliedDate}
+                {roleLabel} · ansökte {c.appliedDate}
               </div>
               <div style={{ display: 'flex', gap: 7, marginTop: 9, flexWrap: 'wrap' }}>
                 <span className={`tag src-${c.source}`}>{c.source}</span>
@@ -230,11 +268,19 @@ function CandidateDrawer({ c }: { c: Candidate }) {
           {tab === 'feedback' && <CandidateFeedback c={c} />}
           {tab === 'dokument' && (
             <div className="grid" style={{ gap: 12 }}>
-              {['CV_' + c.name.replace(' ', '_') + '.pdf', 'Personligt_brev.pdf'].map(doc => (
-                <div key={doc} className="doc-preview">
+              {([
+                { label: `CV_${c.name.replace(/\s+/g, '_')}.html`, kind: 'cv' as const },
+                { label: `Personligt_brev_${c.name.replace(/\s+/g, '_')}.html`, kind: 'brev' as const },
+              ]).map(doc => (
+                <div key={doc.kind} className="doc-preview">
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-                    <b>📄 {doc}</b>
-                    <button className="btn small" onClick={demo}>Ladda ner</button>
+                    <b>📄 {doc.label}</b>
+                    <button
+                      className="btn small"
+                      onClick={() => { downloadDocument(c, roleLabel, doc.kind); toast(`${doc.label} nedladdad`) }}
+                    >
+                      Ladda ner
+                    </button>
                   </div>
                   <div className="doc-line w60" />
                   <div className="doc-line w80" />
@@ -254,7 +300,7 @@ function CandidateDrawer({ c }: { c: Candidate }) {
 export function Kandidater() {
   const { candidateId } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { byId } = useStore()
+  const { byId, roles } = useStore()
   const roleId = searchParams.get('roll') ?? 'backend'
   const cand = candidateId ? byId(candidateId) : undefined
 
@@ -266,7 +312,7 @@ export function Kandidater() {
           <div className="sub">Dra kort mellan kolumner — avslag kräver alltid en loggad orsak.</div>
         </div>
         <div className="role-switcher">
-          {ROLES.map(r => (
+          {roles.map(r => (
             <button
               key={r.id}
               className={roleId === r.id ? 'on' : ''}

@@ -1,6 +1,99 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useStore } from '../store'
+
+function ProfileCard({ startInEdit }: { startInEdit: boolean }) {
+  const { profile, updateProfile } = useStore()
+  const [editing, setEditing] = useState(startInEdit)
+  const [draft, setDraft] = useState(profile)
+
+  const startEdit = () => { setDraft(profile); setEditing(true) }
+  const save = () => { updateProfile(draft); setEditing(false) }
+
+  return (
+    <div className="card" data-testid="profile-card">
+      <h2 style={{ marginBottom: 10 }}>Profil</h2>
+      {editing ? (
+        <div className="grid" style={{ gap: 8 }}>
+          <div>
+            <label className="small muted">Namn</label>
+            <input className="editable-input" value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} />
+          </div>
+          <div>
+            <label className="small muted">Roll</label>
+            <input className="editable-input" value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} />
+          </div>
+          <div>
+            <label className="small muted">E-post</label>
+            <input className="editable-input" value={draft.email} onChange={e => setDraft(d => ({ ...d, email: e.target.value }))} />
+          </div>
+          <div>
+            <label className="small muted">Notiser</label>
+            <input className="editable-input" value={draft.notiser} onChange={e => setDraft(d => ({ ...d, notiser: e.target.value }))} />
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+            <button className="btn small" onClick={() => setEditing(false)}>Avbryt</button>
+            <button
+              className={`btn small primary${draft.name.trim() ? '' : ' disabled'}`}
+              disabled={!draft.name.trim()}
+              onClick={save}
+            >
+              Spara ✓
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <table className="tbl">
+            <tbody>
+              <tr><td className="muted">Namn</td><td>{profile.name}</td></tr>
+              <tr><td className="muted">Roll</td><td>{profile.title}</td></tr>
+              <tr><td className="muted">E-post</td><td>{profile.email}</td></tr>
+              <tr><td className="muted">Notiser</td><td>{profile.notiser}</td></tr>
+            </tbody>
+          </table>
+          <button className="btn small" style={{ marginTop: 10 }} onClick={startEdit}>Redigera profil</button>
+        </>
+      )}
+    </div>
+  )
+}
+
+function TeamCard() {
+  const { team, addMember } = useStore()
+  const [inviting, setInviting] = useState(false)
+  const [name, setName] = useState('')
+  const [title, setTitle] = useState('')
+
+  const invite = () => {
+    if (!name.trim()) return
+    addMember({ name: name.trim(), title: title.trim() || 'Bedömare' })
+    setName(''); setTitle(''); setInviting(false)
+  }
+
+  return (
+    <div className="card">
+      <h2 style={{ marginBottom: 10 }}>Team</h2>
+      <table className="tbl">
+        <tbody>
+          {team.map(m => (
+            <tr key={m.name}><td>{m.name}</td><td className="muted">{m.title}</td></tr>
+          ))}
+        </tbody>
+      </table>
+      {inviting ? (
+        <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+          <input className="editable-input" style={{ flex: 1, minWidth: 120 }} placeholder="Namn" value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key === 'Enter' && invite()} />
+          <input className="editable-input" style={{ flex: 1, minWidth: 120 }} placeholder="Titel" value={title} onChange={e => setTitle(e.target.value)} onKeyDown={e => e.key === 'Enter' && invite()} />
+          <button className="btn small" onClick={() => setInviting(false)}>Avbryt</button>
+          <button className={`btn small primary${name.trim() ? '' : ' disabled'}`} disabled={!name.trim()} onClick={invite}>Lägg till</button>
+        </div>
+      ) : (
+        <button className="btn small" style={{ marginTop: 10 }} onClick={() => setInviting(true)}>Bjud in medlem</button>
+      )}
+    </div>
+  )
+}
 
 const DATAMODELL = [
   {
@@ -43,10 +136,10 @@ const DATAMODELL = [
 
 export function Installningar() {
   const location = useLocation()
-  const { demo } = useStore()
   const dmRef = useRef<HTMLDivElement>(null)
   const params = new URLSearchParams(location.search)
   const showDatamodell = params.get('panel') === 'datamodell'
+  const editProfile = params.get('edit') === 'profil'
 
   useEffect(() => {
     if (showDatamodell) {
@@ -64,30 +157,8 @@ export function Installningar() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-        <div className="card">
-          <h2 style={{ marginBottom: 10 }}>Profil</h2>
-          <table className="tbl">
-            <tbody>
-              <tr><td className="muted">Namn</td><td>Eva Lindqvist</td></tr>
-              <tr><td className="muted">Roll</td><td>Rekryterare</td></tr>
-              <tr><td className="muted">E-post</td><td>eva.lindqvist@bolaget.se</td></tr>
-              <tr><td className="muted">Notiser</td><td>Direkt vid chefsfeedback · dagligen för övrigt</td></tr>
-            </tbody>
-          </table>
-          <button className="btn small" style={{ marginTop: 10 }} onClick={demo}>Redigera profil</button>
-        </div>
-        <div className="card">
-          <h2 style={{ marginBottom: 10 }}>Team</h2>
-          <table className="tbl">
-            <tbody>
-              <tr><td>Marcus Öhrn</td><td className="muted">Utvecklingschef · bedömare</td></tr>
-              <tr><td>Karin Ahlgren</td><td className="muted">Ekonomichef · bedömare</td></tr>
-              <tr><td>Peter Sandell</td><td className="muted">COO · bedömare</td></tr>
-              <tr><td>Nadia Berg</td><td className="muted">Teamlead · bedömare</td></tr>
-            </tbody>
-          </table>
-          <button className="btn small" style={{ marginTop: 10 }} onClick={demo}>Bjud in medlem</button>
-        </div>
+        <ProfileCard key={String(editProfile)} startInEdit={editProfile} />
+        <TeamCard />
       </div>
 
       <div className="card" ref={dmRef} style={showDatamodell ? { borderColor: 'var(--green-mid)' } : undefined}>

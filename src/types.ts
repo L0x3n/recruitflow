@@ -1,4 +1,5 @@
-export type RoleId = 'backend' | 'ekonomi' | 'kundtjanst' | 'historisk'
+// Löst typad så att nya roller kan skapas i appen ('backend', 'ekonomi', … + dynamiska id:n)
+export type RoleId = string
 
 export type StageId =
   | 'nya'
@@ -104,6 +105,7 @@ export interface FeedbackRequest {
   channel?: 'röst' | 'foto' | 'text'
   responseTime?: string
   voice?: { duration: string; quote: string }
+  remindedAt?: string
 }
 
 export interface Offer {
@@ -115,6 +117,19 @@ export interface Offer {
   lon: string
   startDate: string
   acceptedDate?: string
+  remindedAt?: string
+}
+
+export interface Profile {
+  name: string
+  title: string
+  email: string
+  notiser: string
+}
+
+export interface TeamMember {
+  name: string
+  title: string
 }
 
 export interface Notification {

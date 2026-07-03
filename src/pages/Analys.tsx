@@ -1,12 +1,30 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { FUNNELS, ROLES, SOURCE_ECONOMY, TIME_IN_STAGE } from '../data'
+import { FUNNELS, SOURCE_ECONOMY, TIME_IN_STAGE } from '../data'
 import { useStore } from '../store'
+import type { Candidate, StageId } from '../types'
+
+const STAGE_RANK: Record<StageId, number> = {
+  nya: 0, screening: 1, intervju: 2, case: 3, slutintervju: 4, referenser: 5, erbjudande: 6, anstalld: 7, avslag: -1,
+}
+
+// Tratt för roller som skapats i appen — härleds ur live-pipelinen.
+function deriveFunnel(candidates: Candidate[], roleId: string) {
+  const of = candidates.filter(c => c.roleId === roleId)
+  const atLeast = (rank: number) => of.filter(c => STAGE_RANK[c.stage] >= rank).length
+  return [
+    { steg: 'Ansökningar', antal: of.length },
+    { steg: 'Screening', antal: atLeast(1) },
+    { steg: 'Intervju', antal: atLeast(2) },
+    { steg: 'Erbjudande', antal: atLeast(6) },
+    { steg: 'Anställd', antal: atLeast(7) },
+  ]
+}
 
 export function Analys() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { candidates } = useStore()
+  const { candidates, roles } = useStore()
   const [roleId, setRoleId] = useState('backend')
 
   useEffect(() => {
@@ -16,8 +34,8 @@ export function Analys() {
     }
   }, [location])
 
-  const funnel = FUNNELS[roleId]
-  const max = funnel[0].antal
+  const funnel = FUNNELS[roleId] ?? deriveFunnel(candidates, roleId)
+  const max = funnel[0].antal || 1
   const hires = candidates.filter(c => c.historical)
 
   return (
@@ -34,7 +52,7 @@ export function Analys() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
             <h2>Tratt per roll</h2>
             <div className="role-switcher">
-              {ROLES.map(r => (
+              {roles.map(r => (
                 <button key={r.id} className={roleId === r.id ? 'on' : ''} onClick={() => setRoleId(r.id)} style={{ padding: '4px 10px', fontSize: 12 }}>
                   {r.titel.split('-')[0].split(' ')[0]}
                 </button>

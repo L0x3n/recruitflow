@@ -1,7 +1,6 @@
 import { Fragment } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Radar } from '../components/charts'
-import { OFFERS, ROLES, roleTitle } from '../data'
 import { useStore } from '../store'
 
 const TOP3 = ['c-johan', 'c-lisa', 'c-amir']
@@ -27,8 +26,8 @@ function Confetti() {
 
 export function Erbjudanden() {
   const navigate = useNavigate()
-  const { byId, demo } = useStore()
-  const role = ROLES.find(r => r.id === 'backend')!
+  const { byId, roles, offers, remindOffer, roleTitleOf } = useStore()
+  const role = roles.find(r => r.id === 'backend')!
   const cands = TOP3.map(id => byId(id)!)
 
   // Medelpoäng per kriterium per kandidat (över alla scorecards)
@@ -109,7 +108,7 @@ export function Erbjudanden() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-        {OFFERS.map(o => {
+        {offers.map(o => {
           const c = byId(o.candidateId)!
           const accepted = o.status === 'accepterat'
           return (
@@ -121,7 +120,7 @@ export function Erbjudanden() {
                   {accepted ? `✓ Accepterat ${o.acceptedDate}` : `⏰ Väntar — går ut ${o.expiryDate}`}
                 </span>
               </div>
-              <div className="muted small" style={{ marginBottom: 10 }}>{roleTitle(c.roleId)}</div>
+              <div className="muted small" style={{ marginBottom: 10 }}>{roleTitleOf(c.roleId)}</div>
               <table className="tbl">
                 <tbody>
                   <tr><td className="muted">Skickat</td><td className="num">{o.sentDate}</td></tr>
@@ -131,7 +130,14 @@ export function Erbjudanden() {
                 </tbody>
               </table>
               {!accepted && (
-                <button className="btn small" style={{ marginTop: 10 }} onClick={demo}>Skicka påminnelse</button>
+                <button
+                  className={`btn small${o.remindedAt ? ' disabled' : ''}`}
+                  style={{ marginTop: 10 }}
+                  disabled={!!o.remindedAt}
+                  onClick={() => remindOffer(o.id)}
+                >
+                  {o.remindedAt ? `Påminnelse skickad ${o.remindedAt.slice(11)} ✓` : 'Skicka påminnelse'}
+                </button>
               )}
               <button
                 className="btn small"

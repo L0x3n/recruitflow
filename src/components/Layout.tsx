@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { CANDIDATES, DATA_BADGES, NOTIFICATIONS, ROLES, roleTitle } from '../data'
+import { DATA_BADGES, NOTIFICATIONS } from '../data'
 import { useStore } from '../store'
 import { RejectModal } from './RejectModal'
 import { Tour } from './Tour'
@@ -14,27 +14,32 @@ const NAV = [
   { to: '/analys', ico: '∿', label: 'Analys' },
 ]
 
+function useClickOutside(onOutside: () => void) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onOutside()
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [onOutside])
+  return ref
+}
+
 function GlobalSearch() {
   const [q, setQ] = useState('')
   const navigate = useNavigate()
-  const wrapRef = useRef<HTMLDivElement>(null)
+  const { candidates, roles, roleTitleOf } = useStore()
+  const wrapRef = useClickOutside(() => setQ(''))
 
   const hits = useMemo(() => {
     const s = q.trim().toLowerCase()
     if (s.length < 2) return { cands: [], roles: [] }
     return {
-      cands: CANDIDATES.filter(c => c.name.toLowerCase().includes(s)).slice(0, 6),
-      roles: ROLES.filter(r => r.titel.toLowerCase().includes(s)),
+      cands: candidates.filter(c => c.name.toLowerCase().includes(s)).slice(0, 6),
+      roles: roles.filter(r => r.titel.toLowerCase().includes(s)),
     }
-  }, [q])
-
-  useEffect(() => {
-    const onClick = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setQ('')
-    }
-    document.addEventListener('mousedown', onClick)
-    return () => document.removeEventListener('mousedown', onClick)
-  }, [])
+  }, [q, candidates, roles])
 
   const open = hits.cands.length > 0 || hits.roles.length > 0
   return (
@@ -56,7 +61,7 @@ function GlobalSearch() {
           {hits.cands.map(c => (
             <button key={c.id} onClick={() => { setQ(''); navigate(`/kandidater/${c.id}`) }}>
               <span><b>{c.name}</b></span>
-              <span className="sr-sub">{roleTitle(c.roleId)}</span>
+              <span className="sr-sub">{c.historical?.roleLabel ?? roleTitleOf(c.roleId)}</span>
             </button>
           ))}
         </div>
@@ -68,14 +73,7 @@ function GlobalSearch() {
 function Bell() {
   const [open, setOpen] = useState(false)
   const navigate = useNavigate()
-  const ref = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    const onClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', onClick)
-    return () => document.removeEventListener('mousedown', onClick)
-  }, [])
+  const ref = useClickOutside(() => setOpen(false))
   return (
     <div className="bell-wrap" ref={ref}>
       <button className="bell" onClick={() => setOpen(o => !o)} aria-label="Notiser">
@@ -90,6 +88,43 @@ function Bell() {
               <div className="pop-time">{n.time}</div>
             </button>
           ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AccountMenu() {
+  const [open, setOpen] = useState(false)
+  const navigate = useNavigate()
+  const { profile, startTour } = useStore()
+  const ref = useClickOutside(() => setOpen(false))
+  const initials = profile.name.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()
+
+  return (
+    <div className="avatar-wrap" ref={ref}>
+      <button className="avatar-chip" onClick={() => setOpen(o => !o)}>
+        <div className="avatar">{initials}</div>
+        <div style={{ textAlign: 'left' }}>
+          <div className="avatar-name">{profile.name}</div>
+          <div className="avatar-role">{profile.title}</div>
+        </div>
+      </button>
+      {open && (
+        <div className="popover">
+          <div className="pop-head">
+            {profile.name}
+            <div className="pop-time">{profile.title} · {profile.email}</div>
+          </div>
+          <button className="pop-item" onClick={() => { setOpen(false); navigate('/installningar?edit=profil') }}>
+            ✎ Redigera profil
+          </button>
+          <button className="pop-item" onClick={() => { setOpen(false); navigate('/installningar') }}>
+            ⚙ Inställningar
+          </button>
+          <button className="pop-item" onClick={() => { setOpen(false); startTour() }}>
+            ✦ Starta guidad tur
+          </button>
         </div>
       )}
     </div>
@@ -161,7 +196,6 @@ function Toasts() {
 
 export function Layout() {
   const { startTour } = useStore()
-  const { demo } = useStore()
   return (
     <div className="app">
       <aside className="sidebar">
@@ -194,13 +228,7 @@ export function Layout() {
           <div className="spacer" />
           <button className="btn primary" onClick={startTour}>✦ Guidad tur</button>
           <Bell />
-          <button className="avatar-chip" onClick={demo}>
-            <div className="avatar">EL</div>
-            <div style={{ textAlign: 'left' }}>
-              <div className="avatar-name">Eva Lindqvist</div>
-              <div className="avatar-role">Rekryterare</div>
-            </div>
-          </button>
+          <AccountMenu />
         </header>
         <div className="content">
           <ArrivalBanner />

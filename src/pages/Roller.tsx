@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ROLES } from '../data'
 import { useStore } from '../store'
 import type { Role } from '../types'
 
@@ -123,12 +122,14 @@ function Annonsering({ role }: { role: Role }) {
             <td className="num"><b>{totalKostnad.toLocaleString('sv-SE')} kr</b></td>
             <td className="num" />
             <td className="num"><b>{totalAns}</b></td>
-            <td className="num"><b>{Math.round(totalKostnad / totalAns).toLocaleString('sv-SE')} kr</b></td>
+            <td className="num"><b>{totalAns ? `${Math.round(totalKostnad / totalAns).toLocaleString('sv-SE')} kr` : '—'}</b></td>
           </tr>
         </tbody>
       </table>
       <div className="muted small" style={{ marginTop: 10 }}>
-        Varje ansökan taggas automatiskt med sin källkanal — därför vet vi exakt vad varje kanal levererar.
+        {totalAns
+          ? 'Varje ansökan taggas automatiskt med sin källkanal — därför vet vi exakt vad varje kanal levererar.'
+          : 'Inga ansökningar ännu — siffrorna fylls i automatiskt när annonseringen startar.'}
       </div>
     </div>
   )
@@ -160,11 +161,89 @@ function Intervjuplan({ role }: { role: Role }) {
   )
 }
 
+function NewRoleModal({ onClose }: { onClose: () => void }) {
+  const { addRole } = useStore()
+  const navigate = useNavigate()
+  const [titel, setTitel] = useState('')
+  const [chef, setChef] = useState('')
+  const [chefTitel, setChefTitel] = useState('')
+  const [lon, setLon] = useState('')
+  const [start, setStart] = useState('')
+  const [mustHave, setMustHave] = useState('')
+  const [meriterande, setMeriterande] = useState('')
+  const [krit, setKrit] = useState('')
+
+  const valid = titel.trim().length > 1 && chef.trim().length > 1
+  const splitList = (s: string) => s.split(/[,\n]/).map(x => x.trim()).filter(Boolean)
+
+  const create = () => {
+    if (!valid) return
+    const id = addRole({
+      titel: titel.trim(),
+      chef: chef.trim(),
+      chefTitel: chefTitel.trim(),
+      lonespann: lon.trim(),
+      startdatum: start.trim(),
+      mustHave: splitList(mustHave),
+      meriterande: splitList(meriterande),
+      succekriterier: krit.split('\n').map(x => x.trim()).filter(Boolean),
+    })
+    onClose()
+    navigate(`/roller/${id}`)
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" style={{ width: 520 }} onClick={e => e.stopPropagation()}>
+        <h2>Ny roll</h2>
+        <div className="modal-sub">Kravprofilen är måttstocken — ju mer du fyller i nu, desto bättre blir varje bedömning.</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 10px' }}>
+          <div>
+            <label className="small muted">Titel *</label>
+            <input className="editable-input" style={{ marginBottom: 10 }} value={titel} onChange={e => setTitel(e.target.value)} placeholder="t.ex. UX-designer" />
+          </div>
+          <div>
+            <label className="small muted">Ansvarig chef *</label>
+            <input className="editable-input" style={{ marginBottom: 10 }} value={chef} onChange={e => setChef(e.target.value)} placeholder="t.ex. Anna Ek" />
+          </div>
+          <div>
+            <label className="small muted">Chefens titel</label>
+            <input className="editable-input" style={{ marginBottom: 10 }} value={chefTitel} onChange={e => setChefTitel(e.target.value)} placeholder="t.ex. Designchef" />
+          </div>
+          <div>
+            <label className="small muted">Lönespann</label>
+            <input className="editable-input" style={{ marginBottom: 10 }} value={lon} onChange={e => setLon(e.target.value)} placeholder="t.ex. 45 000 – 55 000 kr/mån" />
+          </div>
+          <div>
+            <label className="small muted">Startdatum</label>
+            <input className="editable-input" style={{ marginBottom: 10 }} value={start} onChange={e => setStart(e.target.value)} placeholder="ÅÅÅÅ-MM-DD" />
+          </div>
+          <div>
+            <label className="small muted">Must-have (kommaseparerade)</label>
+            <input className="editable-input" style={{ marginBottom: 10 }} value={mustHave} onChange={e => setMustHave(e.target.value)} placeholder="Figma, prototyping, 3+ år" />
+          </div>
+        </div>
+        <label className="small muted">Meriterande (kommaseparerade)</label>
+        <input className="editable-input" style={{ marginBottom: 10 }} value={meriterande} onChange={e => setMeriterande(e.target.value)} placeholder="Design systems, motion" />
+        <label className="small muted">Succékriterier efter 6 mån (ett per rad)</label>
+        <textarea className="editable-input" rows={3} style={{ marginBottom: 12, resize: 'vertical' }} value={krit} onChange={e => setKrit(e.target.value)} placeholder="Har levererat omdesign av onboarding&#10;NPS för nya flödet över 45" />
+        <div className="modal-actions">
+          <button className="btn" onClick={onClose}>Avbryt</button>
+          <button className={`btn primary${valid ? '' : ' disabled'}`} disabled={!valid} onClick={create}>
+            Skapa roll
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function Roller() {
   const { roleId } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
-  const { candidates, demo } = useStore()
+  const { candidates, roles } = useStore()
+  const [showNewRole, setShowNewRole] = useState(false)
   const tab = searchParams.get('tab') ?? 'kravprofil'
 
   const counts = useMemo(() => {
@@ -175,7 +254,7 @@ export function Roller() {
     return m
   }, [candidates])
 
-  const role = ROLES.find(r => r.id === roleId)
+  const role = roles.find(r => r.id === roleId)
 
   if (!role) {
     return (
@@ -185,12 +264,12 @@ export function Roller() {
             <h1>Roller</h1>
             <div className="sub">Varje roll börjar med en strukturerad kravprofil — måttstocken för hela processen.</div>
           </div>
-          <button className="btn" onClick={demo}>+ Ny roll</button>
+          <button className="btn" onClick={() => setShowNewRole(true)}>+ Ny roll</button>
         </div>
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          {ROLES.map(r => (
+          {roles.map(r => (
             <div key={r.id} className="role-list-item" onClick={() => navigate(`/roller/${r.id}`)}>
-              <div className="role-icon">{r.id === 'backend' ? '💻' : r.id === 'ekonomi' ? '🧾' : '🎧'}</div>
+              <div className="role-icon">{r.id === 'backend' ? '💻' : r.id === 'ekonomi' ? '🧾' : r.id === 'kundtjanst' ? '🎧' : '📋'}</div>
               <div style={{ flex: 1 }}>
                 <b>{r.titel}</b>
                 <div className="muted small">{r.chef} · {r.chefTitel} · start {r.startdatum}</div>
@@ -202,6 +281,7 @@ export function Roller() {
             </div>
           ))}
         </div>
+        {showNewRole && <NewRoleModal onClose={() => setShowNewRole(false)} />}
       </div>
     )
   }

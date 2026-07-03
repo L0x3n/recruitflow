@@ -278,6 +278,21 @@ table.tbl td.num, table.tbl th.num { text-align: right; font-variant-numeric: ta
 .audio-fake .bar { flex: 1; height: 5px; background: rgba(255, 255, 255, 0.25); border-radius: 999px; overflow: hidden; }
 .audio-fake .bar > div { height: 100%; background: #7FD4AF; border-radius: 999px; transition: width 0.2s linear; }
 .audio-fake .dur { font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.rec-dot { width: 10px; height: 10px; border-radius: 50%; background: #DC2626; animation: pulse 1.1s infinite; }
+.rec-bars { display: flex; gap: 3px; align-items: center; height: 34px; justify-content: center; }
+.rec-bars span {
+  width: 4px; height: 8px; border-radius: 2px; background: var(--green-mid);
+  animation: recbar 0.8s ease-in-out infinite alternate;
+}
+@keyframes recbar { from { height: 6px; opacity: 0.5; } to { height: 30px; opacity: 1; } }
+.photo-note {
+  background: repeating-linear-gradient(#FFFDF5, #FFFDF5 22px, #EFE8D2 23px);
+  border: 1px solid #E8DFC4; border-radius: 8px; padding: 10px 14px;
+  font-family: 'Segoe Print', 'Comic Sans MS', cursive; font-size: 13px; color: #4A4636;
+  transform: rotate(-1deg); box-shadow: var(--shadow); line-height: 23px;
+}
+.sc-dot.clickable { cursor: pointer; }
+.sc-dot.clickable:hover { outline: 2px solid var(--green-mid); outline-offset: 1px; }
 .fb-item { border: 1px solid var(--border); border-radius: 12px; padding: 13px 15px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .fb-item .fb-main { flex: 1; min-width: 200px; }
 .fb-status { font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 999px; }
